@@ -36,15 +36,6 @@ class TagCategoryConfig:
     category_to_token_ids: Dict[str, List[int]]
 
 
-class OverrideMask:
-    allow: np.ndarray
-    disallow: np.ndarray
-
-    def __init__(self, allow: np.ndarray, disallow: np.ndarray) -> None:
-        self.allow = allow
-        self.disallow = disallow
-
-
 def load_tag_category_config(config_json: str):
     with open(config_json, "rb") as file:
         config: TagCategoryConfig = TagCategoryConfig(**json.loads(file.read()))
