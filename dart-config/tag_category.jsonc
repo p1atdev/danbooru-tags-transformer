@@ -1,0 +1,30 @@
+{
+  "categories": {
+    "1": {
+      "name": "rating",
+      "bos_token_id": 4,
+      "eos_token_id": 5
+    },
+    "2": {
+      "name": "copyright",
+      "bos_token_id": 6,
+      "eos_token_id": 7
+    },
+    "3": {
+      "name": "character",
+      "bos_token_id": 8,
+      "eos_token_id": 9
+    },
+    "4": {
+      "name": "general",
+      "bos_token_id": 10,
+      "eos_token_id": 11
+    }
+  },
+  "category_to_token_ids": {
+    "1": [],
+    "2": [],
+    "3": [],
+    "4": []
+  }
+}
