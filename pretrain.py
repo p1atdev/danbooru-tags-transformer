@@ -6,34 +6,29 @@ from transformers import (
     set_seed,
     DataCollatorForLanguageModeling,
     Trainer,
-    AutoModelForMaskedLM,
+    GenerationConfig,
 )
-from datasets import (
-    Dataset,
-    load_from_disk,
-)
+from datasets import Dataset, load_from_disk, load_dataset
 from dart.configuration_dart import DartConfig
 from dart.modeling_dart import DartForCausalLM
-
-import evaluate
 
 import wandb
 
 
 CACHE_DIR = "/huggingface/cache"
 
-DATASET_NAME = "./danbooru-tokenized-20240216"
+DATASET_NAME = "p1atdev/dart-tokenized-pretrain-20240219"
 
 # BASE_MODEL_NAME = "FacebookAI/roberta-base"
-TOKENIZER_NAME = "p1atdev/tokenizer_test_1"
+TOKENIZER_NAME = "p1atdev/dart-tokenizer-v1"
 
 # MAX_LENGTH = 256
 
 SEED = 202340214
 
 PROJECT_NAME = "danbooru-tag-transformer"
-OUTPUT_DIR = "./dart-test-1"
-HUB_MODEL_ID = "p1atdev/dart-test-1"
+OUTPUT_DIR = "./dart-test-3"
+HUB_MODEL_ID = "p1atdev/dart-test-3"
 
 
 def get_models():
@@ -47,13 +42,26 @@ def get_models():
     model = DartForCausalLM(config)
     model.to(torch.bfloat16)
 
+    generation_config = GenerationConfig(
+        bos_token_id=tokenizer.bos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.pad_token_id,
+        max_new_tokens=128,
+        do_sample=True,
+        temperature=1.0,
+        top_p=1.0,
+        top_k=20,
+        num_beams=1,
+    )
+    model.generation_config = generation_config
+
     return tokenizer, model
 
 
 def main():
     set_seed(SEED)
 
-    dataset = load_from_disk(DATASET_NAME)
+    dataset = load_dataset(DATASET_NAME, split="train", cache_dir=CACHE_DIR)
     assert isinstance(dataset, Dataset)
     dataset = dataset.train_test_split(test_size=2000, shuffle=True, seed=SEED)
 
@@ -105,7 +113,7 @@ def main():
 
     trainer = Trainer(
         model=model,  # type: ignore
-        tokenizer=tokenizer,
+        # tokenizer=tokenizer, # can't upload tokenizer because it has custom decoder
         args=train_args,
         train_dataset=train_dataset,  # type: ignore
         eval_dataset=test_dataset,  # type: ignore
