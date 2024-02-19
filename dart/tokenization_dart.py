@@ -1,13 +1,14 @@
 import logging
 import os
 import json
-from typing import Optional, Dict, List, Set, Tuple, Union, Literal, Type
+from typing import Optional, Dict, List, Tuple, Union
 from pydantic.dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
 
 from transformers import PreTrainedTokenizerFast
+from tokenizers.decoders import Decoder
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,31 @@ def load_tag_category(config_json: str):
     return config
 
 
+class DartDecoder:
+    def __init__(self, special_tokens: List[str]):
+        self.special_tokens = list(special_tokens)
+
+    def decode_chain(self, tokens: List[str]) -> List[str]:
+        new_tokens = []
+        is_specials = []
+
+        for i, token in enumerate(tokens):
+            is_specials.append(token in self.special_tokens)
+
+            if i == 0:
+                new_tokens.append(token)
+                continue
+
+            # this token or previous token is special
+            if is_specials[i] or is_specials[i - 1]:
+                new_tokens.append(token)
+                continue
+
+            new_tokens.append(f", {token}")
+
+        return new_tokens
+
+
 class DartTokenizer(PreTrainedTokenizerFast):
     """Dart tokenizer"""
 
@@ -73,6 +99,10 @@ class DartTokenizer(PreTrainedTokenizerFast):
 
     def __init__(self, tag_category, **kwargs):
         super().__init__(**kwargs)
+
+        self._tokenizer.decoder = Decoder.custom(  # type: ignore
+            DartDecoder(list(self.get_added_vocab().keys()))
+        )
 
         self.tag_category_config = load_tag_category(tag_category)
 
@@ -122,7 +152,7 @@ class DartTokenizer(PreTrainedTokenizerFast):
         elif isinstance(tokens, int):
             tokens = [tokens]
         elif isinstance(tokens, list):
-            tokens = [
+            tokens = [  # type: ignore
                 self.convert_tokens_to_ids(token) if isinstance(token, str) else token
                 for token in tokens
             ]
