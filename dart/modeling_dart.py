@@ -40,9 +40,14 @@ from transformers.utils import (
 from .configuration_dart import DartConfig
 
 
-if is_flash_attn_2_available():
-    from flash_attn import flash_attn_func, flash_attn_varlen_func
-    from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
+try:  # noqa: SIM105
+    if is_flash_attn_2_available():
+        from flash_attn import flash_attn_func, flash_attn_varlen_func
+        from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input
+except ImportError:
+    # Workaround for https://github.com/huggingface/transformers/issues/28459,
+    # don't move to contextlib.suppress(ImportError)
+    pass
 
 
 logger = logging.get_logger(__name__)
