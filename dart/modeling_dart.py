@@ -801,7 +801,7 @@ class DartDecoder(DartPreTrainedModel):
                 config.max_position_embeddings, config.hidden_size
             )
             if config.use_position_embeddings
-            else nn.Identity()
+            else None
         )
 
         if config.word_embed_proj_dim != config.hidden_size:
@@ -975,7 +975,9 @@ class DartDecoder(DartPreTrainedModel):
         if self.project_in is not None:
             inputs_embeds = self.project_in(inputs_embeds)
 
-        hidden_states = inputs_embeds
+        hidden_states = inputs_embeds 
+        if self.embed_positions is not None:
+            hidden_states += self.embed_positions
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
