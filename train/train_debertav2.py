@@ -22,6 +22,7 @@ CONFIG_PATH = "./config/debertav2/small.json"
 
 PROJECT_NAME = "dart2vec_deberta_1"
 PUSH_HUB_NAME = "p1atdev/dart2vec-deberta_1"
+SAVE_DIR = "./dart2vec-deberta_1"
 
 
 def prepare_models():
@@ -31,6 +32,7 @@ def prepare_models():
     tokenizer.mask_token = "<|mask|>"  # specify mask token
 
     config = DebertaV2Config.from_json_file(CONFIG_PATH)
+    config.vocab_size = tokenizer.vocab_size
 
     model = DebertaV2ForMaskedLM._from_config(config)
     model.to(torch.bfloat16)
@@ -62,7 +64,7 @@ def main():
 
     # wandb.init(project=PROJECT_NAME)
     train_args = TrainingArguments(
-        output_dir="./dart2vec_5",
+        output_dir=SAVE_DIR,
         overwrite_output_dir=True,
         num_train_epochs=10,
         # auto_find_batch_size=True,
@@ -87,7 +89,7 @@ def main():
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         dataloader_num_workers=accelerator.num_processes,
-        torch_compile=True,
+        # torch_compile=True,
         bf16=True,
         report_to=[],
         hub_model_id=PUSH_HUB_NAME,
