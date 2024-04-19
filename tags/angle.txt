@@ -1,8 +1,0 @@
-dutch angle
-from above
-from behind
-from below
-from side
-sideways
-straight-on
-upside-down
