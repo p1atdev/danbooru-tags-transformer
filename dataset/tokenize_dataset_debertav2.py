@@ -10,7 +10,7 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 DATASET_NAME = "202402-at20240326"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
+TOKENIZER_NAME = "p1atdev/dart-popular-general-tags-tokenizer"
 
 NUM_PROC = 40
 
@@ -48,16 +48,6 @@ def tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
     }
 
 
-def pad_input_ids(example: Dataset, tokenizer: PreTrainedTokenizer):
-    input_ids = example["input_ids"]
-    input_ids = [ids[:MAX_LENGTH] for ids in input_ids]
-    input_ids = [
-        ids + [tokenizer.pad_token_id] * (MAX_LENGTH - len(ids)) for ids in input_ids
-    ]
-
-    return {"input_ids": input_ids}
-
-
 def main():
     set_seed(SEED)
 
@@ -84,13 +74,6 @@ def main():
 
     # filter out short input_ids
     ds = ds.filter(lambda x: len(x["input_ids"]) > 10, batched=False)
-
-    # # pad
-    # ds = ds.map(
-    #     lambda x: pad_input_ids(x, tokenizer),
-    #     batched=True,
-    #     num_proc=NUM_PROC,
-    # )
 
     # train test split
     ds = ds.train_test_split(
