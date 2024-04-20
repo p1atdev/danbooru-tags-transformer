@@ -172,3 +172,7 @@ runs
 # data
 data/*
 !data/.gitkeep
+
+# models
+dart2vec_*
+dart2vec-*
