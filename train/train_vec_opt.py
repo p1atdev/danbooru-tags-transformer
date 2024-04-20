@@ -18,11 +18,11 @@ SEED = 20240419
 
 TOKENIZER_NAME = "p1atdev/dart-popular-general-tags-tokenizer"
 DATASET_NAME = "p1atdev/202402-at20240420-tokenized"
-CONFIG_PATH = "./config/gemma/small.json"
+CONFIG_PATH = "./config/opt/small.json"
 
-PROJECT_NAME = "dart2vec_gemma_1"
-PUSH_HUB_NAME = "p1atdev/dart2vec-gemma_1"
-SAVE_DIR = "./dart2vec_gemma_1"
+PROJECT_NAME = "dart2vec_opt_1"
+PUSH_HUB_NAME = "p1atdev/dart2vec-opt_1"
+SAVE_DIR = "./dart2vec_opt_1"
 
 
 def prepare_models():
