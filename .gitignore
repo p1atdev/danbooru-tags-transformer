@@ -168,3 +168,7 @@ danbooru-*
 # logs
 wandb
 runs
+
+# data
+data/*
+!data/.gitkeep
