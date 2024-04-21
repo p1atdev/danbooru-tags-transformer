@@ -106,6 +106,7 @@ def main():
         train_dataset=dataset["train"],  # type: ignore
         eval_dataset=dataset["test"],  # type: ignore
         data_collator=data_collator,
+        dataset_text_field="text",
         neftune_noise_alpha=5,
     )
 

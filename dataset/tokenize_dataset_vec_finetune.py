@@ -48,6 +48,7 @@ def tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
 
 def insert_sft_token(examples: Dataset, tokenizer: PreTrainedTokenizer):
     input_ids_list = []
+    texts = []
 
     for input_ids in examples["input_ids"]:
         # shuffle input_ids
@@ -61,8 +62,12 @@ def insert_sft_token(examples: Dataset, tokenizer: PreTrainedTokenizer):
 
         input_ids_list.append(input_ids)
 
+        text = tokenizer.decode(input_ids, skip_special_tokens=False)[0]
+        texts.append(text)
+
     return {
         "input_ids": input_ids_list,
+        "text": texts,
     }
 
 
@@ -97,7 +102,6 @@ def main():
     ds = ds.map(
         lambda x: insert_sft_token(x, tokenizer),
         batched=True,
-        remove_columns=ds.column_names,
         num_proc=NUM_PROC,
     )
 
