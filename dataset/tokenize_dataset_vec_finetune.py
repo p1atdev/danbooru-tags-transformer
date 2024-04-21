@@ -39,13 +39,24 @@ def tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
         # remove unk tokens
         input_ids = [i for i in input_ids if i != tokenizer.unk_token_id]
 
+        input_ids_list.append(input_ids)
+
+    return {
+        "input_ids": input_ids_list,
+    }
+
+
+def insert_sft_token(examples: Dataset, tokenizer: PreTrainedTokenizer):
+    input_ids_list = []
+
+    for input_ids in examples["input_ids"]:
         # shuffle input_ids
         np.random.shuffle(input_ids)
 
         # insert <|reserved_0|> token to random index
         input_ids.insert(
-            np.random.random_integers(len(input_ids) - 1),
-            tokenizer._convert_token_to_id(INPUT_END_TOKEN),
+            np.random.randint(1, len(input_ids) - 1),
+            tokenizer.convert_tokens_to_ids(INPUT_END_TOKEN),
         )
 
         input_ids_list.append(input_ids)
@@ -81,6 +92,14 @@ def main():
 
     # filter out short input_ids
     ds = ds.filter(lambda x: len(x["input_ids"]) > 10, batched=False)
+
+    # insert sft token
+    ds = ds.map(
+        lambda x: insert_sft_token(x, tokenizer),
+        batched=True,
+        remove_columns=ds.column_names,
+        num_proc=NUM_PROC,
+    )
 
     # train test split
     ds = ds.train_test_split(
