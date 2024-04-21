@@ -11,6 +11,7 @@ DATASET_NAME = "202402-at20240326"
 DATASET_SPLIT = "train"
 
 TOKENIZER_NAME = "p1atdev/dart-popular-general-tags-tokenizer"
+INPUT_END_TOKEN = "<|reserved_0|>"
 
 NUM_PROC = 40
 
@@ -40,6 +41,12 @@ def tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
 
         # shuffle input_ids
         np.random.shuffle(input_ids)
+
+        # insert <|reserved_0|> token to random index
+        input_ids.insert(
+            np.random.random_integers(len(input_ids) - 1),
+            tokenizer._convert_token_to_id(INPUT_END_TOKEN),
+        )
 
         input_ids_list.append(input_ids)
 
@@ -80,7 +87,9 @@ def main():
         test_size=10000,
     )
 
-    ds.push_to_hub("p1atdev/202402-at20240418-tokenized", max_shard_size="4096MB")
+    ds.push_to_hub(
+        "p1atdev/202402-at20240421-tokenized-finetune", max_shard_size="4096MB"
+    )
 
 
 if __name__ == "__main__":

@@ -2,27 +2,27 @@ import torch
 
 from datasets import Dataset, load_from_disk, load_dataset
 from transformers import (
-    Trainer,
     TrainingArguments,
     AutoTokenizer,
     set_seed,
-    OPTConfig,
     OPTForCausalLM,
-    DataCollatorForLanguageModeling,
 )
+from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from accelerate import Accelerator
 
 # import wandb
 
 SEED = 20240419
 
+BASE_MODEL_NAME = "p1atdev/dart2vec-opt_4"
 TOKENIZER_NAME = "p1atdev/dart-popular-general-tags-tokenizer"
 DATASET_NAME = "p1atdev/202402-at20240420-tokenized"
-CONFIG_PATH = "./config/opt/small.json"
 
 PROJECT_NAME = "dart2vec_opt_1"
-PUSH_HUB_NAME = "p1atdev/dart2vec-opt_1"
-SAVE_DIR = "./dart2vec_opt_1"
+PUSH_HUB_NAME = "p1atdev/dart2vec-opt_5"
+SAVE_DIR = "./dart2vec_opt_5"
+
+RESPONSE_TEMPLATE = "<|reserved_0|>"
 
 
 def prepare_models():
@@ -30,18 +30,12 @@ def prepare_models():
         TOKENIZER_NAME, padding="max_length", truncation=True, max_length=256
     )
 
-    config = OPTConfig.from_json_file(CONFIG_PATH)
-    config.vocab_size = tokenizer.vocab_size
-    config.bos_token_id = tokenizer.bos_token_id
-    config.eos_token_id = tokenizer.eos_token_id
-    config.pad_token_id = tokenizer.pad_token_id
-
-    model = OPTForCausalLM._from_config(config)
+    model = OPTForCausalLM.from_pretrained(BASE_MODEL_NAME)
     model.to(torch.bfloat16)
 
     # freeze the position embeddings
     model.model.decoder.embed_positions.requires_grad_(False)
-    # init the weights with zeros
+    # # init the weights with zeros
     model.model.decoder.embed_positions.weight.data.zero_()
 
     return tokenizer, model
@@ -60,7 +54,8 @@ def main():
 
     dataset = prepare_dataset()
 
-    data_collator = DataCollatorForLanguageModeling(
+    data_collator = DataCollatorForCompletionOnlyLM(
+        response_template=RESPONSE_TEMPLATE,
         tokenizer=tokenizer,
         mlm=False,
     )
@@ -72,12 +67,12 @@ def main():
     train_args = TrainingArguments(
         output_dir=SAVE_DIR,
         overwrite_output_dir=True,
-        num_train_epochs=10,
+        num_train_epochs=5,
         # auto_find_batch_size=True,
         per_device_train_batch_size=128,
         per_device_eval_batch_size=64,
         gradient_accumulation_steps=1,
-        learning_rate=1e-2,
+        learning_rate=8e-4,
         warmup_steps=100,
         weight_decay=0.0,
         optim="adamw_torch_fused",
@@ -87,8 +82,8 @@ def main():
             "threshold": 1e-4,
         },
         evaluation_strategy="steps",
-        eval_steps=500,
-        save_steps=500,
+        eval_steps=1000,
+        save_steps=1000,
         save_total_limit=2,
         logging_steps=10,
         logging_first_step=True,
@@ -104,13 +99,14 @@ def main():
         save_safetensors=True,
     )
 
-    trainer = Trainer(
+    trainer = SFTTrainer(
         model=model,  # type: ignore
         tokenizer=tokenizer,  # can't upload tokenizer because it has custom decoder
         args=train_args,
         train_dataset=dataset["train"],  # type: ignore
         eval_dataset=dataset["test"],  # type: ignore
         data_collator=data_collator,
+        neftune_noise_alpha=5,
     )
 
     trainer.train(
