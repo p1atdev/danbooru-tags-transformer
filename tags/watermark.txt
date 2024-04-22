@@ -1,0 +1,37 @@
+signature
+logo
+dated
+artist name
+artist logo
+circle name
+company name
+copyright name
+copyright notice
+watermark
+sample watermark
+web address
+pawoo username
+pixiv username
+pixiv id
+weibo username
+weibo logo
+fanbox username
+lofter username
+reddit username
+tumblr username
+twitch username
+twitter username
+twitter logo
+gumroad username 
+patreon username
+patreon logo
+youtube username 
+facebook username 
+instagram username
+instagram logo
+artstation username 
+deviantart username
+furaffinity username
+subscribestar username
+hentai-foundry username
+creator name
