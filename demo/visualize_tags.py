@@ -1,17 +1,17 @@
 import torch
 import io
 
-from transformers import AutoTokenizer, DebertaV2Model
+from transformers import AutoTokenizer, AutoModel
 
 
-TOKENIZER_NAME = "p1atdev/dart2vec-deberta_1"
-MODEL_NAME = "p1atdev/dart2vec-deberta_1"
+TOKENIZER_NAME = "p1atdev/dart2vec-opt_5"
+MODEL_NAME = "p1atdev/dart2vec-opt_5"
 
 
 def prepare_embeddings():
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
-    model = DebertaV2Model.from_pretrained(MODEL_NAME)
-    embeddings = model.get_input_embeddings().weight.detach().cpu().numpy()
+    model = AutoModel.from_pretrained(MODEL_NAME)
+    embeddings = model.decoder.embed_tokens.weight.detach().cpu().numpy()
 
     id2label = tokenizer.get_vocab()
 
