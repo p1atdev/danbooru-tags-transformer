@@ -18,7 +18,7 @@ SEED = 20240419
 
 TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
 DATASET_NAME = "p1atdev/202403-at20240423-tokenized-shuffle"
-CONFIG_PATH = "./config/opt/small.json"
+CONFIG_PATH = "./config/opt/125m.json"
 
 PROJECT_NAME = "dart2vec_opt_1"
 PUSH_HUB_NAME = "p1atdev/dart2vec-opt_7"
