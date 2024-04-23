@@ -49,8 +49,11 @@ ASPECT_RATIO_ULTRA_TALL = "<|aspect_ratio:ultra_tall|>"
 INPUT_START = "<|input_start|>"
 INPUT_END = "<|input_end|>"
 
-# flags
-FLAG_KEEP_IDENTITY = "<|keep_identity|>"
+# identity level
+IDENTITY_LEVEL_NONE = "<|identity:none|>"
+IDENTITY_LEVEL_LAX = "<|identity:lax|>"
+IDENTITY_LEVEL_STRICT = "<|identity:strict|>"
+
 
 # reserved
 RESERVED_TOKENS = [f"<|reserved_{i}|>" for i in range(64)]
