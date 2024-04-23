@@ -16,13 +16,13 @@ from accelerate import Accelerator
 
 SEED = 20240419
 
-TOKENIZER_NAME = "p1atdev/dart-popular-general-tags-tokenizer"
-DATASET_NAME = "p1atdev/202402-at20240420-tokenized"
+TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
+DATASET_NAME = "p1atdev/202403-at20240423-tokenized-shuffle"
 CONFIG_PATH = "./config/opt/small.json"
 
 PROJECT_NAME = "dart2vec_opt_1"
-PUSH_HUB_NAME = "p1atdev/dart2vec-opt_1"
-SAVE_DIR = "./dart2vec_opt_1"
+PUSH_HUB_NAME = "p1atdev/dart2vec-opt_7"
+SAVE_DIR = "./dart2vec_opt_7"
 
 
 def prepare_models():
@@ -72,12 +72,12 @@ def main():
     train_args = TrainingArguments(
         output_dir=SAVE_DIR,
         overwrite_output_dir=True,
-        num_train_epochs=10,
+        num_train_epochs=5,
         # auto_find_batch_size=True,
-        per_device_train_batch_size=128,
-        per_device_eval_batch_size=64,
-        gradient_accumulation_steps=1,
-        learning_rate=1e-2,
+        per_device_train_batch_size=64,
+        per_device_eval_batch_size=32,
+        gradient_accumulation_steps=2,
+        learning_rate=1e-3,
         warmup_steps=100,
         weight_decay=0.0,
         optim="adamw_torch_fused",
@@ -87,15 +87,15 @@ def main():
             "threshold": 1e-4,
         },
         evaluation_strategy="steps",
-        eval_steps=500,
-        save_steps=500,
+        eval_steps=1000,
+        save_steps=1000,
         save_total_limit=2,
         logging_steps=10,
         logging_first_step=True,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         dataloader_num_workers=accelerator.num_processes,
-        # torch_compile=True,
+        torch_compile=True,
         bf16=True,
         report_to=[],
         hub_model_id=PUSH_HUB_NAME,
