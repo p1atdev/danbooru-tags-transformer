@@ -12,8 +12,6 @@ from src.organizer import TagOrganizer
 from src.composer import TagComposer
 from src.tags import FLAG_KEEP_IDENTITY
 
-from .tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
-
 MAX_LENGTH = 256
 
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
@@ -72,6 +70,43 @@ def prepare_tokenizer():
     return tokenizer
 
 
+def map_split_tags(examples: Dataset, tokenizer: PreTrainedTokenizer):
+    general_list = []
+    character_list = []
+    copyright_list = []
+
+    for i, id in enumerate(examples["id"]):
+        general: str = examples["general"][i]
+        character: str = examples["character"][i]
+        copyright: str = examples["copyright"][i]
+
+        if character is None:
+            character = ""
+        if copyright is None:
+            copyright = ""
+
+        character_list.append((character).split(", "))
+        copyright_list.append((copyright).split(", "))
+
+        # encode general tags and remove unk tokens, then decode
+        general_token_ids = tokenizer.encode_plus(
+            general, add_special_tokens=False
+        ).input_ids
+        general_token_ids = [
+            token_id
+            for token_id in general_token_ids
+            if token_id != tokenizer.unk_token_id
+        ]
+        general_tags = tokenizer.batch_decode(general_token_ids)
+        general_list.append(general_tags)
+
+    return {
+        "general": general_list,
+        "character": character_list,
+        "copyright": copyright_list,
+    }
+
+
 def map_format_tags(examples: Dataset, composer: TagComposer):
     text_list = []
 
@@ -83,7 +118,7 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
         image_width = examples["image_width"][i]
         image_height = examples["image_height"][i]
 
-        prompt = composer.compose_sft_prompt(
+        prompt = composer.compose_prompt(
             rating=rating,
             copyright=copyright,
             character=character,
@@ -99,6 +134,24 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
     }
 
 
+def map_tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
+    input_ids_list = []
+
+    for tag in example["text"]:
+        input_ids = tokenizer(tag, padding=False, truncation=False).input_ids
+        # remove unk tokens
+        input_ids = [i for i in input_ids if i != tokenizer.unk_token_id]
+
+        # shuffle
+        np.random.shuffle(input_ids)
+
+        input_ids_list.append(input_ids)
+
+    return {
+        "input_ids": input_ids_list,
+    }
+
+
 def main():
     set_seed(SEED)
 
@@ -108,10 +161,6 @@ def main():
     tag_composer = TagComposer(
         tag_organizer,
         keep_identity_token=FLAG_KEEP_IDENTITY,
-        fuzzy_rating_rate=FUZZY_RATING_RATE,
-        drop_people_rate=DROP_PEOPLE_RATE,
-        keep_identity_rate=KEEP_IDENTITY_RATE,
-        keep_identity_condition_rate=KEEP_IDENTITY_CONDITION_RATE,
     )
 
     ds = prepare_dataset()
@@ -187,9 +236,7 @@ def main():
         test_size=10000,
     )
 
-    ds.push_to_hub(
-        "p1atdev/dart-v2-20240423-sft", max_shard_size="4096MB", private=True
-    )
+    ds.push_to_hub("p1atdev", max_shard_size="4096MB", private=True)
 
 
 if __name__ == "__main__":
