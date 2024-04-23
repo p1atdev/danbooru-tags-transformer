@@ -50,6 +50,7 @@ INPUT_START = "<|input_start|>"
 INPUT_END = "<|input_end|>"
 
 # identity level
+FLAG_KEEP_IDENTITY = "<|keep_identity|>"
 IDENTITY_LEVEL_NONE = "<|identity:none|>"
 IDENTITY_LEVEL_LAX = "<|identity:lax|>"
 IDENTITY_LEVEL_STRICT = "<|identity:strict|>"

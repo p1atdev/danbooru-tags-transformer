@@ -7,15 +7,15 @@ from .tags import (
 )
 
 
-def calculate_aspect_ratio_tag(height: int, width: int):
+def calculate_aspect_ratio_tag(width: int, height: int):
     """Calculate the aspect ratio tag based on the height and width of the image."""
     aspect_ratio = width / height
 
     if aspect_ratio <= 1 / 2:
         return ASPECT_RATIO_ULTRA_TALL
-    elif aspect_ratio <= 0.9:
+    elif aspect_ratio <= 8 / 9:  #
         return ASPECT_RATIO_TALL
-    elif aspect_ratio < 1 / 0.9:
+    elif aspect_ratio < 9 / 8:
         return ASPECT_RATIO_SQUARE
     elif aspect_ratio < 2:
         return ASPECT_RATIO_WIDE

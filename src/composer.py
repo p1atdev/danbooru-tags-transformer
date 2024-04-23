@@ -83,12 +83,21 @@ class TagComposer:
         pre_tags.extend(result.people_tags)
         pre_tags.extend(result.focus_tags)
 
+        if len(result.other_tags) == 1:
+            # if there is only one cluster, assign to post_tags
+            post_tags.extend(result.other_tags[0])
+            return pre_tags, post_tags
+
         for cluster_tags in result.other_tags:
             # randomly assign to pre or post
             if np.random.rand() < condition_rate:
                 pre_tags.extend(cluster_tags)
             else:
                 post_tags.extend(cluster_tags)
+
+        # if post_tags or pre_tags is empty, retry
+        if len(pre_tags) == 0 or len(post_tags) == 0:
+            return self.recompose_tags(tags, condition_rate)
 
         return pre_tags, post_tags
 
@@ -177,7 +186,7 @@ class TagComposer:
             post_general_part=post_part,
         )
 
-    def compose_prompt(
+    def compose_sft_prompt(
         self,
         rating: SHORT_RATING_TAG,
         copyright: list[str],
