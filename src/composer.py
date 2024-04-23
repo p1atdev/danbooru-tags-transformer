@@ -136,7 +136,7 @@ class TagComposer:
         # shuffle pre_tags
         np.random.shuffle(pre_tags)
         # sort post_tags
-        post_tags.sort()
+        post_tags = sorted(post_tags)
 
         # shuffle copyright and character tags
         np.random.shuffle(copyright)
@@ -173,7 +173,7 @@ class TagComposer:
         # shuffle pre_part
         np.random.shuffle(pre_part)
         # sort post_part
-        post_part.sort()
+        post_part = sorted(post_part)
 
         # shuffle copyright and character tags
         np.random.shuffle(copyright)
@@ -255,5 +255,49 @@ class TagComposer:
                 ", ".join(condition.post_general_part),
                 GENERAL_END,
             ]
+
+        return "".join(tags)
+
+    def compose_prompt(
+        self,
+        rating: SHORT_RATING_TAG,
+        copyright: list[str],
+        character: list[str],
+        general: list[str],
+        image_width: int,
+        image_height: int,
+    ):
+        """
+        Get condition tags in the prompt.
+
+        This function should be called when creating a dataset for pretraining.
+        """
+
+        common = self.get_common_tags(
+            rating=rating,
+            general=general,
+            image_width=image_width,
+            image_height=image_height,
+        )
+
+        # sort tags
+        copyright = sorted(copyright)
+        character = sorted(character)
+        general = sorted(general)
+
+        tags = [
+            COPYRIGHT_START,
+            ", ".join(copyright),
+            COPYRIGHT_END,
+            CHARACTER_START,
+            ", ".join(character),
+            CHARACTER_END,
+            common.rating_tag,
+            common.aspect_ratio_tag,
+            common.length_tag,
+            GENERAL_START,
+            ", ".join(general),
+            GENERAL_END,
+        ]
 
         return "".join(tags)

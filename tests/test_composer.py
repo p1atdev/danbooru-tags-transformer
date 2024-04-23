@@ -101,12 +101,13 @@ def test_composer_get_free_condition_part():
     common = tag_composer.get_free_condition_part(
         copyright=["vocaloid"],
         character=["hatsune miku"],
-        general=["1girl", "cat ears"],
+        general=["1girl", "cat ears", "blue hair"],
     )
 
     assert common.copyright_part == ["vocaloid"]
     assert common.character_part == ["hatsune miku"]
     assert "1girl" in common.pre_general_part
+    assert common.post_general_part == sorted(common.post_general_part)
 
 
 def test_composer_compose_sft_prompt():
@@ -130,4 +131,29 @@ def test_composer_compose_sft_prompt():
 
     assert prompt.startswith(
         "<copyright>aaa</copyright><character>bbb</character><|rating:general|><|aspect_ratio:tall|><|legnth:very_short|><general>"
+    )
+
+
+def test_composer_compose_prompt():
+    organizer = TagOrganizer(group, cluster)
+
+    tag_composer = TagComposer(
+        organizer,
+        keep_identity_token=KEEP_IDENTITY_TOKEN,
+        fuzzy_rating_rate=0,
+        drop_people_rate=0,
+    )
+
+    prompt = tag_composer.compose_prompt(
+        rating="g",
+        copyright=["aaa"],
+        character=["bbb"],
+        general=["1girl", "cat ears", "blue hair"],
+        image_width=896,
+        image_height=1152,
+    )
+
+    assert (
+        prompt
+        == "<copyright>aaa</copyright><character>bbb</character><|rating:general|><|aspect_ratio:tall|><|legnth:very_short|><general>1girl, blue hair, cat ears</general>"
     )
