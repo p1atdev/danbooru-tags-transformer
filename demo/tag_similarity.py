@@ -3,15 +3,19 @@ from transformers import AutoTokenizer, AutoModel
 
 import gradio as gr
 
-TOKENIZER_NAME = "p1atdev/dart2vec-opt_5"
-MODEL_NAME = "p1atdev/dart2vec-opt_5"
+TOKENIZER_NAME = "p1atdev/dart2vec-opt_6"
+MODEL_NAME = "p1atdev/dart2vec-opt_6"
 
 
 def prepare_embeddings() -> dict[str, np.ndarray]:
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
     model = AutoModel.from_pretrained(MODEL_NAME)
 
-    embeddings: np.ndarray = model.decoder.embed_tokens.weight.detach().cpu().numpy()
+    embeddings: np.ndarray = model.get_input_embeddings().weight.detach().numpy()
+
+    # normalize embeddings
+    embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
+
     labels = tokenizer.get_vocab()
 
     label2emb = {label: embeddings[index] for label, index in labels.items()}
@@ -42,7 +46,13 @@ def demo():
         with gr.Row():
             with gr.Column():
                 tag_input = gr.Textbox(label="Enter a tag", placeholder="blue hair")
-                top_k_input = gr.Number(label="Top K", value=30)
+                top_k_input = gr.Slider(
+                    label="Top K",
+                    minimum=2,
+                    maximum=100,
+                    value=30,
+                    step=1,
+                )
 
             with gr.Column():
                 similar_tags_label = gr.Label(label="Similar tags")
