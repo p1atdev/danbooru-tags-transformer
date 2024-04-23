@@ -15,7 +15,6 @@ from src.aspect_ratio import calculate_aspect_ratio_tag
 from src.length import get_length_tag
 from src.tags import (
     INPUT_END,
-    FLAG_KEEP_IDENTITY,
     BOS_TOKEN,
     EOS_TOKEN,
     COPYRIGHT_START,
@@ -34,7 +33,7 @@ DATASET_SPLIT = "train"
 
 TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
 
-AMBITIOUS_RATING_RATE = 0.25
+FUZZY_RATING_RATE = 0.25
 DROP_PEOPLE_RATE = 0.1
 KEEP_IDENTITY_RATE = 0.5
 KEEP_IDENTITY_CONDITION_RATE = 0.5
@@ -82,35 +81,6 @@ def prepare_tokenizer():
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
 
     return tokenizer
-
-
-def recompose_tags(
-    organizer: TagOrganizer,
-    tags: list[str],
-    condition_rate: float = 0.5,
-) -> tuple[list[str], list[str]]:
-    """
-    Recompose tags by group and cluster.
-
-    This keeps the identity of a character in the prompt.
-    """
-
-    result = organizer.organize_tags(tags)
-
-    pre_tags = []
-    post_tags = []
-
-    pre_tags.extend(result.people_tags)
-    pre_tags.extend(result.focus_tags)
-
-    for cluster_tags in result.other_tags:
-        # randomly assign to pre or post
-        if np.random.rand() < condition_rate:
-            pre_tags.extend(cluster_tags)
-        else:
-            post_tags.extend(cluster_tags)
-
-    return pre_tags, post_tags
 
 
 def map_split_tags(examples: Dataset):
