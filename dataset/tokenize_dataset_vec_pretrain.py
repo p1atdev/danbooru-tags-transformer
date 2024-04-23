@@ -7,10 +7,10 @@ from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 MAX_LENGTH = 256
 
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
-DATASET_NAME = "202402-at20240326"
+REVISION = "202403-at20240423"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-popular-general-tags-tokenizer"
+TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
 
 NUM_PROC = 40
 
@@ -18,7 +18,7 @@ SEED = 12345
 
 
 def prepare_dataset():
-    ds = load_dataset(DATASET_REPO_ID, name=DATASET_NAME, split=DATASET_SPLIT)
+    ds = load_dataset(DATASET_REPO_ID, revision=REVISION, split=DATASET_SPLIT)
     assert isinstance(ds, Dataset)
 
     return ds
@@ -37,6 +37,9 @@ def tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
         input_ids = tokenizer(tag, padding=False, truncation=False).input_ids
         # remove unk tokens
         input_ids = [i for i in input_ids if i != tokenizer.unk_token_id]
+
+        # shuffle
+        np.random.shuffle(input_ids)
 
         input_ids_list.append(input_ids)
 
@@ -58,7 +61,9 @@ def main():
 
     # filter out empty text
     ds = ds.filter(
-        lambda x: x["text"] is not None and len(x["text"].strip()) > 0, batched=False
+        lambda x: x["text"] is not None and len(x["text"].strip()) > 0,
+        batched=False,
+        num_proc=NUM_PROC,
     )
 
     # tokenize
@@ -70,7 +75,11 @@ def main():
     )
 
     # filter out short input_ids
-    ds = ds.filter(lambda x: len(x["input_ids"]) > 10, batched=False)
+    ds = ds.filter(
+        lambda x: len(x["input_ids"]) > 10,
+        batched=False,
+        num_proc=NUM_PROC,
+    )
 
     # train test split
     ds = ds.train_test_split(
@@ -78,7 +87,7 @@ def main():
     )
 
     ds.push_to_hub(
-        "p1atdev/202402-at20240421-tokenized-pretrain", max_shard_size="4096MB"
+        "p1atdev/202403-at20240423-tokenized-shuffle", max_shard_size="4096MB"
     )
 
 
