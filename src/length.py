@@ -16,7 +16,7 @@ def get_length_tag(length: int):
         return LENGTH_SHORT
     elif length < 30:
         return LENGTH_MEDIUM
-    elif length < 45:
+    elif length < 40:
         return LENGTH_LONG
     else:
         return LENGTH_VERY_LONG
