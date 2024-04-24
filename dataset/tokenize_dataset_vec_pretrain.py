@@ -16,6 +16,8 @@ NUM_PROC = 40
 
 SEED = 12345
 
+DO_SHUFFLE = True
+
 
 def prepare_dataset():
     ds = load_dataset(DATASET_REPO_ID, revision=REVISION, split=DATASET_SPLIT)
@@ -38,8 +40,9 @@ def tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
         # remove unk tokens
         input_ids = [i for i in input_ids if i != tokenizer.unk_token_id]
 
-        # shuffle
-        np.random.shuffle(input_ids)
+        if DO_SHUFFLE:
+            # shuffle
+            np.random.shuffle(input_ids)
 
         input_ids_list.append(input_ids)
 
@@ -87,7 +90,7 @@ def main():
     )
 
     ds.push_to_hub(
-        "p1atdev/202403-at20240423-tokenized-shuffle", max_shard_size="4096MB"
+        "p1atdev/202403-at20240423-tokenized-unshuffle", max_shard_size="4096MB"
     )
 
 
