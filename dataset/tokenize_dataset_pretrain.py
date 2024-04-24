@@ -139,11 +139,6 @@ def map_tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
 
     for tag in example["text"]:
         input_ids = tokenizer(tag, padding=False, truncation=False).input_ids
-        # remove unk tokens
-        input_ids = [i for i in input_ids if i != tokenizer.unk_token_id]
-
-        # shuffle
-        np.random.shuffle(input_ids)
 
         input_ids_list.append(input_ids)
 
