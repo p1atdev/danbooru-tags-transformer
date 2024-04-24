@@ -323,8 +323,8 @@ class TagComposer:
         return PrompotComponents(
             copyright=", ".join(copyright),
             character=", ".join(character),
-            general_condition=", ".join(general),
-            general_completion="",
+            general_condition="",
+            general_completion=", ".join(general),
             rating=common.rating_tag,
             aspect_ratio=common.aspect_ratio_tag,
             length=common.length_tag,

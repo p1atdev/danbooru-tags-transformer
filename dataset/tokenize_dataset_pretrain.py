@@ -6,11 +6,8 @@ import numpy as np
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
-from src.group import TagGroup
-from src.cluster import TagCluster
-from src.organizer import TagOrganizer
 from src.composer import TagComposer
-from src.tags import FLAG_KEEP_IDENTITY
+from src.formatter import format_pretrain
 
 MAX_LENGTH = 256
 
@@ -22,36 +19,9 @@ TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
 
 FUZZY_RATING_RATE = 0.25
 
-EMBEDDING_MODEL_NAME = "p1atdev/dart2vec-opt_6"
-NUM_CLUSTERS = 40
-NUM_INIT = 10
-MAX_ITER = 1000
-CLUSTER_MAP_PATH = "data/cluster_map.json"
-
 NUM_PROC = 40
 
 SEED = 12345
-
-
-def prepare_cluster():
-    if os.path.exists(CLUSTER_MAP_PATH):
-        cluster = TagCluster.from_pretrained(CLUSTER_MAP_PATH)
-    else:
-        cluster = TagCluster.train_from_embedding_model(
-            EMBEDDING_MODEL_NAME,
-            n_clusters=NUM_CLUSTERS,
-            n_init=NUM_INIT,
-            max_iter=MAX_ITER,
-        )
-        cluster.save_pretrained(CLUSTER_MAP_PATH)
-
-    return cluster
-
-
-def prepare_group():
-    group = TagGroup()
-
-    return group
 
 
 def prepare_dataset():
@@ -115,7 +85,7 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
         image_width = examples["image_width"][i]
         image_height = examples["image_height"][i]
 
-        prompt = composer.compose_prompt(
+        components = composer.get_components(
             rating=rating,
             copyright=copyright,
             character=character,
@@ -123,6 +93,8 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
             image_width=image_width,
             image_height=image_height,
         )
+
+        prompt = format_pretrain(components)
 
         text_list.append(prompt)
 
@@ -147,13 +119,8 @@ def map_tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
 def main():
     set_seed(SEED)
 
-    tag_cluster = prepare_cluster()
-    tag_group = prepare_group()
-    tag_organizer = TagOrganizer(tag_group, tag_cluster)
     tag_composer = TagComposer(
-        tag_organizer,
-        keep_identity_token=FLAG_KEEP_IDENTITY,
-        fuzzy_rating_rate=FUZZY_RATING_RATE,
+        fuzzy_rating_tag_rate=FUZZY_RATING_RATE,
     )
 
     ds = prepare_dataset()
