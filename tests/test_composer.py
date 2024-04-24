@@ -14,26 +14,18 @@ cluster = TagCluster.from_pretrained("data/cluster_map.json")
 
 
 def test_composer():
-    organizer = TagOrganizer(group, cluster)
+    tag_composer = TagComposer()
 
-    tag_composer = TagComposer(
-        organizer,
-        keep_identity_token=KEEP_IDENTITY_TOKEN,
-    )
-
-    assert tag_composer.keep_identity_token == KEEP_IDENTITY_TOKEN
+    assert tag_composer is not None
 
 
 def test_composer_recompose_tags():
     organizer = TagOrganizer(group, cluster)
 
-    tag_composer = TagComposer(
-        organizer,
-        keep_identity_token=KEEP_IDENTITY_TOKEN,
-    )
+    tag_composer = TagComposer()
 
-    pre_tags, post_tags = tag_composer.recompose_tags(
-        tags=[
+    result = organizer.organize_tags(
+        [
             "1girl",  # people tag
             "solo",  # focus tag
             "solo focus",  # focus tag
@@ -43,17 +35,15 @@ def test_composer_recompose_tags():
         ]
     )
 
+    pre_tags, post_tags = tag_composer.recompose_tags(result)
+
     assert "1girl" in pre_tags
     assert "watermark" not in pre_tags and "watermark" not in post_tags
 
 
 def test_composer_get_common_tags():
-    organizer = TagOrganizer(group, cluster)
-
     tag_composer = TagComposer(
-        organizer,
-        keep_identity_token=KEEP_IDENTITY_TOKEN,
-        fuzzy_rating_rate=0,
+        fuzzy_rating_tag_rate=0,
     )
 
     common = tag_composer.get_common_tags(
@@ -68,19 +58,30 @@ def test_composer_get_common_tags():
     assert common.aspect_ratio_tag == "<|aspect_ratio:tall|>"
 
 
+def test_composer_get_common_tags_with_fuzzy_rating_tag():
+    tag_composer = TagComposer(fuzzy_rating_tag_rate=1)
+
+    common = tag_composer.get_common_tags(
+        rating="g",
+        general=["1girl", "cat ears"],
+        image_width=896,
+        image_height=1152,
+    )
+
+    assert common.rating_tag == "<|rating:sfw|>"
+
+
 def test_composer_get_keep_identity_condition_part():
     organizer = TagOrganizer(group, cluster)
 
-    tag_composer = TagComposer(
-        organizer,
-        keep_identity_token=KEEP_IDENTITY_TOKEN,
-        fuzzy_rating_rate=0,
-    )
+    tag_composer = TagComposer(fuzzy_rating_tag_rate=0)
+
+    result = organizer.organize_tags(["1girl", "cat ears"])
 
     common = tag_composer.get_keep_identity_condition_part(
         copyright=["vocaloid"],
         character=["hatsune miku"],
-        general=["1girl", "cat ears"],
+        organizer_result=result,
     )
 
     assert common.copyright_part == ["vocaloid"]
@@ -92,16 +93,16 @@ def test_composer_get_free_condition_part():
     organizer = TagOrganizer(group, cluster)
 
     tag_composer = TagComposer(
-        organizer,
-        keep_identity_token=KEEP_IDENTITY_TOKEN,
-        fuzzy_rating_rate=0,
+        fuzzy_rating_tag_rate=0,
         drop_people_rate=0,
     )
+
+    result = organizer.organize_tags(["1girl", "cat ears", "blue hair"])
 
     common = tag_composer.get_free_condition_part(
         copyright=["vocaloid"],
         character=["hatsune miku"],
-        general=["1girl", "cat ears", "blue hair"],
+        organizer_result=result,
     )
 
     assert common.copyright_part == ["vocaloid"]
@@ -110,50 +111,55 @@ def test_composer_get_free_condition_part():
     assert common.post_general_part == sorted(common.post_general_part)
 
 
-def test_composer_compose_sft_prompt():
+def test_composer_get_components_identity_keep():
     organizer = TagOrganizer(group, cluster)
 
     tag_composer = TagComposer(
-        organizer,
-        keep_identity_token=KEEP_IDENTITY_TOKEN,
-        fuzzy_rating_rate=0,
+        fuzzy_rating_tag_rate=0,
         drop_people_rate=0,
     )
 
-    prompt = tag_composer.compose_sft_prompt(
+    result = organizer.organize_tags(["1girl", "cat ears", "blue hair"])
+
+    components = tag_composer.get_components_identity_keep(
         rating="g",
         copyright=["aaa"],
         character=["bbb"],
-        general=["1girl", "cat ears", "blue hair"],
+        organizer_result=result,
         image_width=896,
         image_height=1152,
     )
 
-    assert prompt.startswith(
-        "<copyright>aaa</copyright><character>bbb</character><|rating:general|><|aspect_ratio:tall|><|legnth:very_short|><general>"
-    )
+    assert components.copyright == "aaa"
+    assert components.character == "bbb"
+    assert components.rating == "<|rating:general|>"
+    assert components.aspect_ratio == "<|aspect_ratio:tall|>"
+    assert components.length == "<|legnth:very_short|>"
+    assert "1girl" in components.general_condition
 
 
-def test_composer_compose_prompt():
+def test_composer_get_components_identity_free():
     organizer = TagOrganizer(group, cluster)
 
     tag_composer = TagComposer(
-        organizer,
-        keep_identity_token=KEEP_IDENTITY_TOKEN,
-        fuzzy_rating_rate=0,
+        fuzzy_rating_tag_rate=0,
         drop_people_rate=0,
     )
 
-    prompt = tag_composer.compose_prompt(
+    result = organizer.organize_tags(["1girl", "cat ears", "blue hair"])
+
+    components = tag_composer.get_components_identity_free(
         rating="g",
         copyright=["aaa"],
         character=["bbb"],
-        general=["1girl", "cat ears", "blue hair"],
+        organizer_result=result,
         image_width=896,
         image_height=1152,
     )
 
-    assert (
-        prompt
-        == "<copyright>aaa</copyright><character>bbb</character><|rating:general|><|aspect_ratio:tall|><|legnth:very_short|><general>1girl, blue hair, cat ears</general>"
-    )
+    assert components.copyright == "aaa"
+    assert components.character == "bbb"
+    assert components.rating == "<|rating:general|>"
+    assert components.aspect_ratio == "<|aspect_ratio:tall|>"
+    assert components.length == "<|legnth:very_short|>"
+    assert "1girl" in components.general_condition
