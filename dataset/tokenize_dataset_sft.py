@@ -1,6 +1,11 @@
+import sys
+
+sys.path.append(".")
+
 import os
 
-import torch
+os.environ["OPENBLAS_NUM_THREADS"] = "1"  # to prevent OpenBLAS's error
+
 import numpy as np
 
 from datasets import load_dataset, Dataset
@@ -13,7 +18,7 @@ from src.composer import TagComposer
 from src.tags import IDENTITY_LEVEL_NONE, IDENTITY_LEVEL_LAX, IDENTITY_LEVEL_STRICT
 from src.formatter import format_sft
 
-from .tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
+from tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
 
 MAX_LENGTH = 256
 
@@ -21,7 +26,7 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202403-at20240422"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
+TOKENIZER_NAME = "p1atdev/dart-v2-tokenizer"
 
 FUZZY_RATING_RATE = 0.25
 DROP_PEOPLE_RATE = 0.1
@@ -33,9 +38,11 @@ IDENTITY_LEVEL_RATES = {
     "none": 0.5,
 }
 
-NUM_PROC = 40
+NUM_PROC = 1
 
 SEED = 12345
+
+DEBUG = True
 
 
 def prepare_group():
@@ -72,17 +79,17 @@ def prepare_cluster(
 DEFAULT_TAG_GROUP = prepare_group()
 EMBEDDING_CLUSTERS = {
     "lax": prepare_cluster(
-        embedding_model_name="p1atdev/dart2vec-opt_8",
+        embedding_model_name="p1atdev/dart-v2-vectors",
         num_clusters=512,
         num_init=20,
-        max_iter=1000,
+        max_iter=500,
         save_path="data/cluster_map_lax.json",
     ),
     "strict": prepare_cluster(
-        embedding_model_name="p1atdev/dart2vec-opt_8",
+        embedding_model_name="p1atdev/dart-v2-vectors",
         num_clusters=320,  # fewer than lax
         num_init=20,
-        max_iter=1000,
+        max_iter=500,
         save_path="data/cluster_map_strict.json",
     ),
 }
@@ -161,9 +168,12 @@ def main():
     ds = prepare_dataset()
     tokenizer = prepare_tokenizer()
 
+    if DEBUG:
+        ds = ds.select(range(1000))
+
     # filter out empty text
     ds = ds.filter(
-        lambda x: x["text"] is not None and len(x["text"].strip()) > 0,
+        lambda x: x["general"] is not None and len(x["general"].strip()) > 0,
         batched=False,
         num_proc=NUM_PROC,
     )
@@ -199,19 +209,21 @@ def main():
     # split tags
     ds = ds.map(
         lambda x: map_split_tags(x, tokenizer),
-        batched=False,
+        batched=True,
         num_proc=NUM_PROC,
     )
 
     # filter too many tags
-    ds = ds.filter(lambda x: len(x["general"]) > 100, batched=False, num_proc=NUM_PROC)
-    ds = ds.filter(lambda x: len(x["character"]) > 10, batched=False, num_proc=NUM_PROC)
-    ds = ds.filter(lambda x: len(x["copyright"]) > 5, batched=False, num_proc=NUM_PROC)
+    ds = ds.filter(lambda x: len(x["general"]) <= 100, batched=False, num_proc=NUM_PROC)
+    ds = ds.filter(
+        lambda x: len(x["character"]) <= 10, batched=False, num_proc=NUM_PROC
+    )
+    ds = ds.filter(lambda x: len(x["copyright"]) <= 5, batched=False, num_proc=NUM_PROC)
 
     # format tags
     ds = ds.map(
         lambda x: map_format_tags(x, tag_composer),
-        batched=False,
+        batched=True,
         num_proc=NUM_PROC,
     )
 
@@ -225,11 +237,13 @@ def main():
 
     # train test split
     ds = ds.train_test_split(
-        test_size=10000,
+        test_size=10000 if not DEBUG else 10,
     )
 
     ds.push_to_hub(
-        "p1atdev/dart-v2-20240423-sft", max_shard_size="4096MB", private=True
+        "p1atdev/dart-v2-20240424-sft",
+        max_shard_size="4096MB",
+        private=True,
     )
 
 
