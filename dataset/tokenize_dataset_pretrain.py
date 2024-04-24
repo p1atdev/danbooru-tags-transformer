@@ -21,9 +21,6 @@ DATASET_SPLIT = "train"
 TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
 
 FUZZY_RATING_RATE = 0.25
-DROP_PEOPLE_RATE = 0.1
-KEEP_IDENTITY_RATE = 0.5
-KEEP_IDENTITY_CONDITION_RATE = 0.5
 
 EMBEDDING_MODEL_NAME = "p1atdev/dart2vec-opt_6"
 NUM_CLUSTERS = 40
@@ -156,6 +153,7 @@ def main():
     tag_composer = TagComposer(
         tag_organizer,
         keep_identity_token=FLAG_KEEP_IDENTITY,
+        fuzzy_rating_rate=FUZZY_RATING_RATE,
     )
 
     ds = prepare_dataset()
@@ -223,15 +221,16 @@ def main():
         num_proc=NUM_PROC,
     )
 
-    # filter out short input_ids
-    ds = ds.filter(lambda x: len(x["input_ids"]) > 10, batched=False)
-
     # train test split
     ds = ds.train_test_split(
         test_size=10000,
     )
 
-    ds.push_to_hub("p1atdev", max_shard_size="4096MB", private=True)
+    ds.push_to_hub(
+        "p1atdev",
+        max_shard_size="4096MB",
+        private=True,
+    )
 
 
 if __name__ == "__main__":

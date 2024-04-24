@@ -1,3 +1,5 @@
+import math
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -41,11 +43,21 @@ class ConditionTags:
 class TagComposer:
     organizer: TagOrganizer
 
+    # rating タグをあいまいにする確率
     fuzzy_rating_rate: float
+    # 人物タグを条件部分に入れ**ない**確率
     drop_people_rate: float
+    # identity を保持する確率
     keep_identity_rate: float
+    # identity を保持する際の条件部分に入る確率
     keep_identity_condition_rate: float
+    # identity を保持する際のトークン
     keep_identity_token: str
+
+    # それぞれのクラスターかタグが条件グループに入る確率
+    condition_rate: float
+    # 版権タグ、キャラクタータグがついているときに、条件とするタグの数を減らす確率
+    copyright_character_augmentation_rate: float
 
     def __init__(
         self,
@@ -55,6 +67,8 @@ class TagComposer:
         drop_people_rate: float = 0.1,
         keep_identity_rate: float = 0.5,
         keep_identity_condition_rate: float = 0.5,
+        condition_rate: float = 0.5,
+        copyright_character_augmentation_rate: float = 1.25,
     ):
         self.organizer = organizer
         self.keep_identity_token = keep_identity_token
@@ -64,10 +78,15 @@ class TagComposer:
         self.keep_identity_rate = keep_identity_rate
         self.keep_identity_condition_rate = keep_identity_condition_rate
 
+        self.condition_rate = condition_rate
+        self.copyright_character_augmentation_rate = (
+            copyright_character_augmentation_rate
+        )
+
     def recompose_tags(
         self,
         tags: list[str],
-        condition_rate: float = 0.5,
+        condition_augmentation_rate: float = 1.0,  # 条件グループへの入りやすさ
     ) -> tuple[list[str], list[str]]:
         """
         Recompose tags by group and cluster.
@@ -90,14 +109,18 @@ class TagComposer:
 
         for cluster_tags in result.other_tags:
             # randomly assign to pre or post
-            if np.random.rand() < condition_rate:
+            if (
+                np.random.rand()
+                < self.condition_rate
+                / condition_augmentation_rate  # 条件グループに含める確率を上げる
+            ):
                 pre_tags.extend(cluster_tags)
             else:
                 post_tags.extend(cluster_tags)
 
         # if post_tags or pre_tags is empty, retry
         if len(pre_tags) == 0 or len(post_tags) == 0:
-            return self.recompose_tags(tags, condition_rate)
+            return self.recompose_tags(tags, condition_augmentation_rate)
 
         return pre_tags, post_tags
 
@@ -130,8 +153,21 @@ class TagComposer:
         character: list[str],
         general: list[str],
     ):
+        # なにかしらの版権テーマ
+        is_copyright_character = len(
+            [tag for tag in copyright if tag != "original"]
+        ) > 0 and len(character)
+
         # keep identity
-        pre_tags, post_tags = self.recompose_tags(general)
+        pre_tags, post_tags = self.recompose_tags(
+            general,
+            (
+                # 版権かキャラクタータグがあれば条件部分のタグ数を減らす
+                self.copyright_character_augmentation_rate
+                if is_copyright_character
+                else 1.0
+            ),
+        )
 
         # shuffle pre_tags
         np.random.shuffle(pre_tags)
@@ -158,9 +194,27 @@ class TagComposer:
         result = self.organizer.organize_tags(general)
         other_tags = sum(result.other_tags, [])  # just flatten
 
+        # なにかしらの版権テーマ
+        is_copyright_character = len(
+            [tag for tag in copyright if tag != "original"]
+        ) > 0 and len(character)
+
         # randomly split result.other_tags
         np.random.shuffle(other_tags)
-        split_index = np.random.randint(0, len(other_tags))
+        split_index = np.random.randint(
+            0,
+            math.ceil(
+                len(other_tags)
+                # 条件部分に入る確率
+                * self.condition_rate
+                # 版権的なものであれば条件部分のタグ数を減らす
+                / (
+                    self.copyright_character_augmentation_rate
+                    if is_copyright_character
+                    else 1.0
+                )
+            ),
+        )
         pre_part = other_tags[:split_index]
         post_part = other_tags[split_index:]
 

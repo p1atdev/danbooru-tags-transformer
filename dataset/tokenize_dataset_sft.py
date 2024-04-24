@@ -26,6 +26,9 @@ FUZZY_RATING_RATE = 0.25
 DROP_PEOPLE_RATE = 0.1
 KEEP_IDENTITY_RATE = 0.5
 KEEP_IDENTITY_CONDITION_RATE = 0.5
+CONDITION_RATE = 0.5
+COPYRIGHT_CHARACTER_AUGMENTATION_RATE = 1.25
+
 
 EMBEDDING_MODEL_NAME = "p1atdev/dart2vec-opt_6"
 NUM_CLUSTERS = 40
@@ -112,6 +115,8 @@ def main():
         drop_people_rate=DROP_PEOPLE_RATE,
         keep_identity_rate=KEEP_IDENTITY_RATE,
         keep_identity_condition_rate=KEEP_IDENTITY_CONDITION_RATE,
+        condition_rate=CONDITION_RATE,
+        copyright_character_augmentation_rate=COPYRIGHT_CHARACTER_AUGMENTATION_RATE,
     )
 
     ds = prepare_dataset()
@@ -178,9 +183,6 @@ def main():
         remove_columns=ds.column_names,
         num_proc=NUM_PROC,
     )
-
-    # filter out short input_ids
-    ds = ds.filter(lambda x: len(x["input_ids"]) > 10, batched=False)
 
     # train test split
     ds = ds.train_test_split(
