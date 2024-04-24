@@ -8,9 +8,10 @@ from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
 from src.group import TagGroup
 from src.cluster import TagCluster
-from src.organizer import TagOrganizer
+from src.organizer import GroupTagOrganizer, ClusterTagOrganizer
 from src.composer import TagComposer
-from src.tags import FLAG_KEEP_IDENTITY
+from src.tags import IDENTITY_LEVEL_NONE, IDENTITY_LEVEL_LAX, IDENTITY_LEVEL_STRICT
+from src.formatter import format_sft
 
 from .tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
 
@@ -24,42 +25,77 @@ TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
 
 FUZZY_RATING_RATE = 0.25
 DROP_PEOPLE_RATE = 0.1
-KEEP_IDENTITY_RATE = 0.5
-KEEP_IDENTITY_CONDITION_RATE = 0.5
 CONDITION_RATE = 0.5
 COPYRIGHT_CHARACTER_AUGMENTATION_RATE = 1.25
-
-
-EMBEDDING_MODEL_NAME = "p1atdev/dart2vec-opt_6"
-NUM_CLUSTERS = 40
-NUM_INIT = 10
-MAX_ITER = 1000
-CLUSTER_MAP_PATH = "data/cluster_map.json"
+IDENTITY_LEVEL_RATES = {
+    "lax": 0.25,
+    "strict": 0.25,
+    "none": 0.5,
+}
 
 NUM_PROC = 40
 
 SEED = 12345
 
 
-def prepare_cluster():
-    if os.path.exists(CLUSTER_MAP_PATH):
-        cluster = TagCluster.from_pretrained(CLUSTER_MAP_PATH)
-    else:
-        cluster = TagCluster.train_from_embedding_model(
-            EMBEDDING_MODEL_NAME,
-            n_clusters=NUM_CLUSTERS,
-            n_init=NUM_INIT,
-            max_iter=MAX_ITER,
-        )
-        cluster.save_pretrained(CLUSTER_MAP_PATH)
-
-    return cluster
-
-
 def prepare_group():
     group = TagGroup()
 
     return group
+
+
+def prepare_cluster(
+    embedding_model_name: str,
+    num_clusters: int,
+    num_init: int,
+    max_iter: int,
+    save_path: str,
+):
+    if os.path.exists(save_path):
+        print("Loading cluster...")
+        cluster = TagCluster.from_pretrained(save_path)
+        print("Cluster loaded.")
+    else:
+        print("Training cluster...")
+        cluster = TagCluster.train_from_embedding_model(
+            embedding_model_name=embedding_model_name,
+            n_clusters=num_clusters,
+            n_init=num_init,
+            max_iter=max_iter,
+        )
+        cluster.save_pretrained(save_path)
+        print("Cluster trained and saved.")
+
+    return cluster
+
+
+DEFAULT_TAG_GROUP = prepare_group()
+EMBEDDING_CLUSTERS = {
+    "lax": prepare_cluster(
+        embedding_model_name="p1atdev/dart2vec-opt_8",
+        num_clusters=512,
+        num_init=20,
+        max_iter=1000,
+        save_path="data/cluster_map_lax.json",
+    ),
+    "strict": prepare_cluster(
+        embedding_model_name="p1atdev/dart2vec-opt_8",
+        num_clusters=320,  # fewer than lax
+        num_init=20,
+        max_iter=1000,
+        save_path="data/cluster_map_strict.json",
+    ),
+}
+TAG_ORGANIZERS = {
+    "none": GroupTagOrganizer(DEFAULT_TAG_GROUP),
+    "lax": ClusterTagOrganizer(DEFAULT_TAG_GROUP, EMBEDDING_CLUSTERS["lax"]),
+    "strict": ClusterTagOrganizer(DEFAULT_TAG_GROUP, EMBEDDING_CLUSTERS["strict"]),
+}
+IDENTITY_LEVEL_TAGS = {
+    "none": IDENTITY_LEVEL_NONE,
+    "lax": IDENTITY_LEVEL_LAX,
+    "strict": IDENTITY_LEVEL_STRICT,
+}
 
 
 def prepare_dataset():
@@ -86,14 +122,24 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
         image_width = examples["image_width"][i]
         image_height = examples["image_height"][i]
 
-        prompt = composer.compose_sft_prompt(
+        # 処理分岐でidentity_levelを変える
+        identity_level: str = np.random.choice(
+            list(IDENTITY_LEVEL_RATES.keys()), p=list(IDENTITY_LEVEL_RATES.values())
+        )
+
+        # parse and organize tags
+        result = TAG_ORGANIZERS[identity_level].organize_tags(general)
+        components = composer.get_components_identity_keep(
             rating=rating,
             copyright=copyright,
             character=character,
-            general=general,
+            organizer_result=result,
             image_width=image_width,
             image_height=image_height,
         )
+
+        # format a prompt
+        prompt = format_sft(components, IDENTITY_LEVEL_TAGS[identity_level])
 
         text_list.append(prompt)
 
@@ -105,16 +151,9 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
 def main():
     set_seed(SEED)
 
-    tag_cluster = prepare_cluster()
-    tag_group = prepare_group()
-    tag_organizer = TagOrganizer(tag_group, tag_cluster)
     tag_composer = TagComposer(
-        tag_organizer,
-        keep_identity_token=FLAG_KEEP_IDENTITY,
-        fuzzy_rating_rate=FUZZY_RATING_RATE,
+        fuzzy_rating_tag_rate=FUZZY_RATING_RATE,
         drop_people_rate=DROP_PEOPLE_RATE,
-        keep_identity_rate=KEEP_IDENTITY_RATE,
-        keep_identity_condition_rate=KEEP_IDENTITY_CONDITION_RATE,
         condition_rate=CONDITION_RATE,
         copyright_character_augmentation_rate=COPYRIGHT_CHARACTER_AUGMENTATION_RATE,
     )

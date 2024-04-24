@@ -4,13 +4,12 @@ sys.path.append(".")
 
 from src.group import TagGroup
 from src.cluster import TagCluster
-from src.organizer import TagOrganizer
+from src.organizer import GroupTagOrganizer
 from src.composer import TagComposer
 
 KEEP_IDENTITY_TOKEN = "<|keep_identity|>"
 
 group = TagGroup()
-cluster = TagCluster.from_pretrained("data/cluster_map.json")
 
 
 def test_composer():
@@ -20,7 +19,7 @@ def test_composer():
 
 
 def test_composer_recompose_tags():
-    organizer = TagOrganizer(group, cluster)
+    organizer = GroupTagOrganizer(group)
 
     tag_composer = TagComposer()
 
@@ -72,7 +71,7 @@ def test_composer_get_common_tags_with_fuzzy_rating_tag():
 
 
 def test_composer_get_keep_identity_condition_part():
-    organizer = TagOrganizer(group, cluster)
+    organizer = GroupTagOrganizer(group)
 
     tag_composer = TagComposer(fuzzy_rating_tag_rate=0)
 
@@ -90,7 +89,7 @@ def test_composer_get_keep_identity_condition_part():
 
 
 def test_composer_get_free_condition_part():
-    organizer = TagOrganizer(group, cluster)
+    organizer = GroupTagOrganizer(group)
 
     tag_composer = TagComposer(
         fuzzy_rating_tag_rate=0,
@@ -112,7 +111,7 @@ def test_composer_get_free_condition_part():
 
 
 def test_composer_get_components_identity_keep():
-    organizer = TagOrganizer(group, cluster)
+    organizer = GroupTagOrganizer(group)
 
     tag_composer = TagComposer(
         fuzzy_rating_tag_rate=0,
@@ -139,7 +138,7 @@ def test_composer_get_components_identity_keep():
 
 
 def test_composer_get_components_identity_free():
-    organizer = TagOrganizer(group, cluster)
+    organizer = GroupTagOrganizer(group)
 
     tag_composer = TagComposer(
         fuzzy_rating_tag_rate=0,
