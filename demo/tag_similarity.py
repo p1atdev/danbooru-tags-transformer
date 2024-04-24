@@ -3,8 +3,8 @@ from transformers import AutoTokenizer, AutoModel
 
 import gradio as gr
 
-TOKENIZER_NAME = "p1atdev/dart2vec-opt_6"
-MODEL_NAME = "p1atdev/dart2vec-opt_6"
+TOKENIZER_NAME = "p1atdev/dart-v2-vectors"
+MODEL_NAME = "p1atdev/dart-v2-vectors"
 
 
 def prepare_embeddings() -> dict[str, np.ndarray]:
