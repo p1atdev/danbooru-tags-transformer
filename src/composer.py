@@ -302,11 +302,17 @@ class TagComposer:
         rating: SHORT_RATING_TAG,
         copyright: list[str],
         character: list[str],
-        general: list[str],
+        organizer_result: TagOrganizerResult,
         image_width: int,
         image_height: int,
     ):
         """Get prompt components."""
+
+        general = (
+            organizer_result.people_tags
+            + organizer_result.focus_tags
+            + sum(organizer_result.other_tags, [])
+        )
 
         common = self.get_common_tags(
             rating=rating,

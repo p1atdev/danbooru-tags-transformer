@@ -5,6 +5,8 @@ sys.path.append(".")
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
+from src.group import TagGroup
+from src.organizer import GroupTagOrganizer
 from src.composer import TagComposer
 from src.formatter import format_pretrain
 
@@ -23,6 +25,9 @@ NUM_PROC = 40
 SEED = 12345
 
 DEBUG = True
+
+TAG_GROUP = TagGroup()
+TAG_ORGANIZER = GroupTagOrganizer(TAG_GROUP)
 
 
 def prepare_dataset():
@@ -86,11 +91,12 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
         image_width = examples["image_width"][i]
         image_height = examples["image_height"][i]
 
+        result = TAG_ORGANIZER.organize_tags(general)
         components = composer.get_components(
             rating=rating,
             copyright=copyright,
             character=character,
-            general=general,
+            organizer_result=result,
             image_width=image_width,
             image_height=image_height,
         )
