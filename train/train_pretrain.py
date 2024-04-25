@@ -63,10 +63,10 @@ def prepare_models():
             if token in vector_vocab:
                 input_embeddings.weight[token_id] = vector_embeddings.weight[
                     vector_vocab[token]
-                ].to(torch.bfloat16)
+                ]
 
     # use the vector model's position embeddings
-    model.set_input_embeddings(input_embeddings)
+    model.set_input_embeddings(input_embeddings.to(model.device, model.dtype))
 
     return tokenizer, model
 
@@ -98,7 +98,7 @@ def main():
         overwrite_output_dir=True,
         num_train_epochs=5,
         # auto_find_batch_size=True,
-        per_device_train_batch_size=64,
+        per_device_train_batch_size=128,
         per_device_eval_batch_size=32,
         gradient_accumulation_steps=2,
         learning_rate=5e-4,

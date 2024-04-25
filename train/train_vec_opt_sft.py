@@ -10,13 +10,13 @@ from transformers import (
 from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from accelerate import Accelerator
 
-# import wandb
+import wandb
 
 SEED = 20240419
 
 BASE_MODEL_NAME = "p1atdev/dart2vec-opt_4"
 TOKENIZER_NAME = "p1atdev/dart-popular-general-tags-tokenizer"
-DATASET_NAME = "p1atdev/202402-at20240420-tokenized"
+DATASET_NAME = "p1atdev/202402-at20240421-tokenized-finetune"
 
 PROJECT_NAME = "dart2vec_opt_1"
 PUSH_HUB_NAME = "p1atdev/dart2vec-opt_5"
@@ -63,15 +63,15 @@ def main():
     accelerator = Accelerator()
     model.to(accelerator.device)
 
-    # wandb.init(project=PROJECT_NAME)
+    wandb.init(project=PROJECT_NAME)
     train_args = TrainingArguments(
         output_dir=SAVE_DIR,
         overwrite_output_dir=True,
         num_train_epochs=5,
         # auto_find_batch_size=True,
-        per_device_train_batch_size=128,
-        per_device_eval_batch_size=64,
-        gradient_accumulation_steps=1,
+        per_device_train_batch_size=64,
+        per_device_eval_batch_size=32,
+        gradient_accumulation_steps=2,
         learning_rate=8e-4,
         warmup_steps=100,
         weight_decay=0.0,
@@ -90,9 +90,9 @@ def main():
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         dataloader_num_workers=accelerator.num_processes,
-        # torch_compile=True,
+        torch_compile=True,
         bf16=True,
-        report_to=[],
+        report_to=["wandb"],
         hub_model_id=PUSH_HUB_NAME,
         hub_private_repo=True,
         push_to_hub=True,
