@@ -52,7 +52,7 @@ def test_composer_get_common_tags():
         image_height=1152,
     )
 
-    assert common.length_tag == "<|legnth:very_short|>"
+    assert common.length_tag == "<|length:very_short|>"
     assert common.rating_tag == "<|rating:general|>"
     assert common.aspect_ratio_tag == "<|aspect_ratio:tall|>"
 
@@ -133,7 +133,7 @@ def test_composer_get_components_identity_keep():
     assert components.character == "bbb"
     assert components.rating == "<|rating:general|>"
     assert components.aspect_ratio == "<|aspect_ratio:tall|>"
-    assert components.length == "<|legnth:very_short|>"
+    assert components.length == "<|length:very_short|>"
     assert "1girl" in components.general_condition
 
 
@@ -160,5 +160,5 @@ def test_composer_get_components_identity_free():
     assert components.character == "bbb"
     assert components.rating == "<|rating:general|>"
     assert components.aspect_ratio == "<|aspect_ratio:tall|>"
-    assert components.length == "<|legnth:very_short|>"
+    assert components.length == "<|length:very_short|>"
     assert "1girl" in components.general_condition

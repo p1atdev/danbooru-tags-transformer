@@ -31,12 +31,12 @@ QUALITY_NORMAL = "<|quality:normal|>"
 QUALITY_LOW = "<|quality:low|>"
 QUALITY_WORST = "<|quality:worst|>"
 
-# total tags legnth
-LENGTH_VERY_SHORT = "<|legnth:very_short|>"
-LENGTH_SHORT = "<|legnth:short|>"
-LENGTH_MEDIUM = "<|legnth:medium|>"
-LENGTH_LONG = "<|legnth:long|>"
-LENGTH_VERY_LONG = "<|legnth:very_long|>"
+# total tags length
+LENGTH_VERY_SHORT = "<|length:very_short|>"
+LENGTH_SHORT = "<|length:short|>"
+LENGTH_MEDIUM = "<|length:medium|>"
+LENGTH_LONG = "<|length:long|>"
+LENGTH_VERY_LONG = "<|length:very_long|>"
 
 # aspect ratio, inspired by DanTagGen
 ASPECT_RATIO_ULTRA_WIDE = "<|aspect_ratio:ultra_wide|>"

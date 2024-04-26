@@ -93,7 +93,7 @@ def main():
             general=general,
             rating=f"<|rating:{rating}|>",
             aspect_ratio=f"<|aspect_ratio:{aspect_ratio}|>",
-            length=f"<|legnth:{length}|>",
+            length=f"<|length:{length}|>",
         )
 
         print(prompt)
