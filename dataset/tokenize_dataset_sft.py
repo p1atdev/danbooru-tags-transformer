@@ -22,6 +22,8 @@ from tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
 
 MAX_LENGTH = 256
 
+PUSH_HUB_NAME = "p1atdev/dart-v2-20240426-sft"
+
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202403-at20240422"
 DATASET_SPLIT = "train"
@@ -83,14 +85,14 @@ EMBEDDING_CLUSTERS = {
         num_clusters=512,
         num_init=20,
         max_iter=500,
-        save_path="data/cluster_map_lax.json",
+        save_path="data/cluster_map_512c.json",
     ),
     "strict": prepare_cluster(
         embedding_model_name="p1atdev/dart-v2-vectors",
-        num_clusters=320,  # fewer than lax
+        num_clusters=256,  # fewer than lax
         num_init=20,
         max_iter=500,
-        save_path="data/cluster_map_strict.json",
+        save_path="data/cluster_map_256c.json",
     ),
 }
 TAG_ORGANIZERS = {
@@ -241,7 +243,7 @@ def main():
     )
 
     ds.push_to_hub(
-        "p1atdev/dart-v2-20240424-sft",
+        PUSH_HUB_NAME,
         max_shard_size="4096MB",
         private=True,
     )
