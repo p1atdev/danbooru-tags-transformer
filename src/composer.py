@@ -108,10 +108,10 @@ class TagComposer:
             else:
                 post_tags.extend(cluster_tags)
 
-        # if post_tags is empty, retry
-        # pre_tag は空でも問題ない
+        # if post_tags is empty, set pre_tags to post_tags
         if len(post_tags) == 0:
-            return self.recompose_tags(organizer_result, condition_augmentation_rate)
+            post_tags = pre_tags
+            pre_tags = []
 
         return pre_tags, post_tags
 
