@@ -89,8 +89,12 @@ class TagComposer:
         pre_tags.extend(organizer_result.focus_tags)
 
         if len(organizer_result.other_tags) == 1:
-            # if there is only one cluster, assign to post_tags
-            post_tags.extend(organizer_result.other_tags[0])
+            # if there is only one cluster, randomly assign to post_tags
+            for tag in organizer_result.other_tags[0]:
+                if np.random.rand() < self.condition_rate:
+                    pre_tags.append(tag)
+                else:
+                    post_tags.append(tag)
             return pre_tags, post_tags
 
         for cluster_tags in organizer_result.other_tags:

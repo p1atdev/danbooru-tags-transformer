@@ -131,10 +131,14 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
         image_width = examples["image_width"][i]
         image_height = examples["image_height"][i]
 
-        # 処理分岐でidentity_levelを変える
-        identity_level: str = np.random.choice(
-            list(IDENTITY_LEVEL_RATES.keys()), p=list(IDENTITY_LEVEL_RATES.values())
-        )
+        if len(character) > 0 or len(copyright) > 0:
+            # 版権タグがある場合はidentity_levelをstrictにする
+            identity_level = "strict"
+        else:
+            # 処理分岐でidentity_levelを変える
+            identity_level: str = np.random.choice(
+                list(IDENTITY_LEVEL_RATES.keys()), p=list(IDENTITY_LEVEL_RATES.values())
+            )
 
         # parse and organize tags
         result = TAG_ORGANIZERS[identity_level].organize_tags(general)
