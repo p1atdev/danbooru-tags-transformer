@@ -22,7 +22,13 @@ from tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
 
 MAX_LENGTH = 256
 
-PUSH_HUB_NAME = "p1atdev/dart-v2-20240426-sft"
+PUSH_HUB_NAME = "p1atdev/dart-v2-20240427-sft"
+SCORE_BOUNDARY = {
+    "g": 1,  # about bottom 20%
+    "s": 1,
+    "q": 4,
+    "e": 5,
+}
 
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202403-at20240422"
@@ -120,6 +126,22 @@ def prepare_tokenizer():
     return tokenizer
 
 
+def filter_by_score(examples: Dataset, score_boundary: dict):
+    """Cut off worst 20%"""
+    flags = []
+
+    for i, rating in enumerate(examples["rating"]):
+        score = examples["score"][i]
+        boundary = score_boundary[rating]
+
+        if score <= boundary:
+            flags.append(False)
+        else:
+            flags.append(True)
+
+    return flags
+
+
 def map_format_tags(examples: Dataset, composer: TagComposer):
     text_list = []
 
@@ -172,6 +194,13 @@ def main():
 
     if DEBUG:
         ds = ds.select(range(1000))
+
+    # filter by score
+    ds = ds.filter(
+        lambda x: filter_by_score(x, SCORE_BOUNDARY),
+        batched=True,
+        num_proc=NUM_PROC,
+    )
 
     # filter out empty text
     ds = ds.filter(
@@ -233,7 +262,6 @@ def main():
     ds = ds.map(
         lambda x: map_tokenize_text(x, tokenizer),
         batched=True,
-        remove_columns=ds.column_names,
         num_proc=NUM_PROC,
     )
 
