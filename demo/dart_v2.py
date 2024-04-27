@@ -1,18 +1,20 @@
 import torch
-import io
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, PreTrainedTokenizerBase
 
+
 import gradio as gr
 
-MODELS = ["p1atdev/dart-v2-llama-100m"]
+MODELS = [
+    "p1atdev/dart-v2-llama-100m",
+    "p1atdev/dart-v2-mistral-100m",
+    "p1atdev/dart-v2-mixtral-100m",
+]
 
 
 def prepare_models(model_name: str):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-    )
+    model = AutoModelForCausalLM.from_pretrained(model_name)
 
     return {
         "tokenizer": tokenizer,
