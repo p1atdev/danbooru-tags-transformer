@@ -126,7 +126,7 @@ def main():
 
     trainer = Trainer(
         model=model,  # type: ignore
-        tokenizer=tokenizer,  # can't upload tokenizer because it has custom decoder
+        tokenizer=tokenizer,
         args=train_args,
         train_dataset=dataset["train"],  # type: ignore
         eval_dataset=dataset["test"],  # type: ignore
