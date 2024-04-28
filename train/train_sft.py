@@ -20,7 +20,7 @@ from src.tags import INPUT_END
 
 # import wandb
 
-SEED = 20240425
+SEED = 20240428
 
 BASE_MODEL_NAME = "p1atdev/dart-v2-llama-100m"
 
@@ -76,7 +76,7 @@ def main():
         per_device_train_batch_size=128,
         per_device_eval_batch_size=32,
         gradient_accumulation_steps=2,
-        learning_rate=5e-4,
+        learning_rate=1e-4,
         warmup_steps=1000,
         weight_decay=0.0,
         optim="adamw_torch_fused",
@@ -90,7 +90,7 @@ def main():
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         dataloader_num_workers=accelerator.num_processes,
-        neftune_noise_alpha=5,  # added
+        # neftune_noise_alpha=5,  # added
         torch_compile=True,
         bf16=True,
         report_to=[],
@@ -100,15 +100,16 @@ def main():
         save_safetensors=True,
     )
 
-    trainer = SFTTrainer(
+    trainer = Trainer(
         model=model,  # type: ignore
         tokenizer=tokenizer,
         args=train_args,
-        dataset_text_field="text",
-        dataset_num_proc=NUM_PROC,
+        # dataset_text_field="text",
+        # dataset_num_proc=NUM_PROC,
         train_dataset=dataset["train"],  # type: ignore
         eval_dataset=dataset["test"],  # type: ignore
         data_collator=data_collator,
+        # max_seq_length=256,
     )
 
     trainer.train(
