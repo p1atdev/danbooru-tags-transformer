@@ -4,6 +4,7 @@ sys.path.append(".")
 
 import argparse
 
+import torch
 from transformers import AutoModel, AutoTokenizer
 from models.dart2vec.configuration_dart2vec import Dart2VecConfig
 from models.dart2vec.modeling_dart2vec import Dart2VecModel
@@ -35,7 +36,7 @@ def main():
     push_to_hub_name = args.push_to_hub_name
 
     print("Loading base model...")
-    model = AutoModel.from_pretrained(base_model_name)
+    model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.bfloat16)
     tokenizer = AutoTokenizer.from_pretrained(base_model_name)
 
     # initialize
