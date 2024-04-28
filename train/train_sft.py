@@ -6,10 +6,10 @@ from transformers import (
     Trainer,
     TrainingArguments,
     AutoTokenizer,
+    AutoModelForCausalLM,
     set_seed,
 )
 from accelerate import Accelerator
-from unsloth import FastLanguageModel
 from trl import DataCollatorForCompletionOnlyLM
 
 from src.tags import INPUT_END
@@ -20,23 +20,20 @@ SEED = 20240425
 
 BASE_MODEL_NAME = "p1atdev/dart-v2-llama-100m"
 
-DATASET_NAME = "p1atdev/dart-v2-20240426-sft"
+DATASET_NAME = "p1atdev/dart-v2-20240428-sft"
 
 PROJECT_NAME = "danbooru-tags-transformer-v2"
 PUSH_HUB_NAME = "p1atdev/dart-v2-llama-100m-sft"
 SAVE_DIR = "./dart-100m-llama-sft"
-
-LOAD_IN_4BIT = True
 
 
 def prepare_models():
     tokenizer = AutoTokenizer.from_pretrained(
         BASE_MODEL_NAME, padding="max_length", truncation=True, max_length=256
     )
-    model = FastLanguageModel.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL_NAME,
-        dtype=None,  # will be auto detected
-        load_in_4bit=LOAD_IN_4BIT,
+        torch_dtype=torch.float16,
     )
 
     return tokenizer, model
