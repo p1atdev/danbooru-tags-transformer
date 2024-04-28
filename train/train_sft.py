@@ -14,7 +14,7 @@ from transformers import (
     set_seed,
 )
 from accelerate import Accelerator
-from trl import DataCollatorForCompletionOnlyLM
+from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
 
 from src.tags import INPUT_END
 
@@ -29,6 +29,8 @@ DATASET_NAME = "p1atdev/dart-v2-20240428-sft"
 PROJECT_NAME = "danbooru-tags-transformer-v2"
 PUSH_HUB_NAME = "p1atdev/dart-v2-llama-100m-sft"
 SAVE_DIR = "./dart-100m-llama-sft"
+
+NUM_PROC = 4
 
 
 def prepare_models():
@@ -98,11 +100,12 @@ def main():
         save_safetensors=True,
     )
 
-    # not use SFTTrainer because the dataset is already tokenized
-    trainer = Trainer(
+    trainer = SFTTrainer(
         model=model,  # type: ignore
         tokenizer=tokenizer,
         args=train_args,
+        dataset_text_field="text",
+        dataset_num_proc=NUM_PROC,
         train_dataset=dataset["train"],  # type: ignore
         eval_dataset=dataset["test"],  # type: ignore
         data_collator=data_collator,
