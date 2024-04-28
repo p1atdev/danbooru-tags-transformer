@@ -1,20 +1,42 @@
+from typing import Literal
+
 import torch
-
 from transformers import AutoTokenizer, AutoModelForCausalLM, PreTrainedTokenizerBase
-
 
 import gradio as gr
 
-MODELS = [
-    "p1atdev/dart-v2-llama-100m",
-    "p1atdev/dart-v2-mistral-100m",
-    "p1atdev/dart-v2-mixtral-100m",
-]
+ALL_MODELS = {
+    "p1atdev/dart-v2-llama-100m": {
+        "type": "pretrain",
+    },
+    "p1atdev/dart-v2-mistral-80m": {
+        "type": "pretrain",
+    },
+    "p1atdev/dart-v2-mistral-100m": {
+        "type": "pretrain",
+    },
+    "p1atdev/dart-v2-mixtral-100m": {
+        "type": "pretrain",
+    },
+    "p1atdev/dart-v2-mixtral-160m": {
+        "type": "pretrain",
+    },
+    "p1atdev/dart-v2-llama-100m-sft": {
+        "type": "sft",
+    },
+    "p1atdev/dart-v2-mistral-100m-sft": {
+        "type": "sft",
+    },
+}
 
 
 def prepare_models(model_name: str):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
+    )
 
     return {
         "tokenizer": tokenizer,
@@ -23,20 +45,31 @@ def prepare_models(model_name: str):
 
 
 def compose_prompt(
+    type: str = "pretrain",
     copyright: str = "",
     character: str = "",
     general: str = "",
     rating: str = "<|rating:sfw|>",
     aspect_ratio: str = "<|aspect_ratio:tall|>",
     length: str = "<|length:long|>",
+    identity: str = "<|identity:none|>",
 ):
-    prompt = (
-        f"<|bos|>"
-        f"<copyright>{copyright.strip()}</copyright>"
-        f"<character>{character.strip()}</character>"
-        f"{rating}{aspect_ratio}{length}"
-        f"<general>{general.strip()}"
-    )
+    if type == "pretrain":
+        prompt = (
+            f"<|bos|>"
+            f"<copyright>{copyright.strip()}</copyright>"
+            f"<character>{character.strip()}</character>"
+            f"{rating}{aspect_ratio}{length}"
+            f"<general>{general.strip()}"
+        )
+    else:
+        prompt = (
+            f"<|bos|>"
+            f"<copyright>{copyright.strip()}</copyright>"
+            f"<character>{character.strip()}</character>"
+            f"{rating}{aspect_ratio}{length}"
+            f"<general>{general.strip()}{identity}<|input_end|>"
+        )
 
     return prompt
 
@@ -55,7 +88,7 @@ def generate_tags(
         )
     )
     output = model.generate(
-        input_ids,
+        input_ids.to(model.device),
         do_sample=True,
         temperature=1,
         top_p=0.9,
@@ -75,7 +108,11 @@ def generate_tags(
 
 
 def main():
-    models = {model_name: prepare_models(model_name) for model_name in MODELS}
+    print("Loading models...")
+
+    models = {
+        model_name: prepare_models(model_name) for model_name in ALL_MODELS.keys()
+    }
 
     def on_generate(
         model_name: str,
@@ -85,17 +122,20 @@ def main():
         rating: str,
         aspect_ratio: str,
         length: str,
+        identity: str,
     ):
         model = models[model_name]["model"]
         tokenizer = models[model_name]["tokenizer"]
 
         prompt = compose_prompt(
+            type=ALL_MODELS[model_name]["type"],
             copyright=copyright,
             character=character,
             general=general,
             rating=f"<|rating:{rating}|>",
             aspect_ratio=f"<|aspect_ratio:{aspect_ratio}|>",
             length=f"<|length:{length}|>",
+            identity=f"<|identity:{identity}|>",
         )
 
         print(prompt)
@@ -141,11 +181,16 @@ def main():
                         choices=["very_short", "short", "medium", "long", "very_long"],
                         value="long",
                     )
+                    input_identity = gr.Radio(
+                        label="Identity",
+                        choices=["none", "lax", "strict"],
+                        value="none",
+                    )
 
                     model_name = gr.Dropdown(
                         label="Model",
-                        choices=list(MODELS),
-                        value=MODELS[0],
+                        choices=list(ALL_MODELS.keys()),
+                        value=list(ALL_MODELS.keys())[0],
                     )
 
                 generate_btn = gr.Button(value="Generate", variant="primary")
@@ -165,6 +210,7 @@ def main():
                 input_rating,
                 input_aspect_ratio,
                 input_length,
+                input_identity,
             ],
             outputs=[generated_tags],
         )

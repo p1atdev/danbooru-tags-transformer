@@ -9,12 +9,9 @@ MODEL_NAME = "p1atdev/dart-v2-vectors"
 
 def prepare_embeddings() -> dict[str, np.ndarray]:
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
-    model = AutoModel.from_pretrained(MODEL_NAME)
+    model = AutoModel.from_pretrained(MODEL_NAME, trust_remote_code=True)
 
     embeddings: np.ndarray = model.get_input_embeddings().weight.detach().numpy()
-
-    # normalize embeddings
-    embeddings /= np.linalg.norm(embeddings, axis=1, keepdims=True)
 
     labels = tokenizer.get_vocab()
 
