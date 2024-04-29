@@ -39,7 +39,7 @@ def prepare_models():
     )
     model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL_NAME,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
     )
 
     return tokenizer, model
