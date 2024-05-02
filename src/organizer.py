@@ -104,6 +104,8 @@ class ClusterTagOrganizer(TagOrganizer):
                         clusters[cluster_id] = []
 
                     clusters[cluster_id].append(tag)
+                else:
+                    raise ValueError(f"Tag {tag} not found in cluster map.")
 
         # クラスタごとにリスト化
         other_tags = list(clusters.values())

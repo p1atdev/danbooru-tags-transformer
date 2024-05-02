@@ -96,6 +96,10 @@ class TagComposer:
             )
             / condition_augmentation_rate  # 条件グループに含める確率を上げる
         )
+        assert condition_rate != 0, f"condition_rate is 0: from {self.condition_rates}"
+
+        if len(organizer_result.other_tags) == 0:
+            raise ValueError(f"No tags to complete!: {organizer_result}")
 
         # クラスターが一つだけの場合は、そのクラスター内で分割
         if len(organizer_result.other_tags) == 1:
@@ -204,12 +208,15 @@ class TagComposer:
 
         # randomly split result.other_tags
         np.random.shuffle(other_tags)
+        condition_rate = np.random.choice(
+            list(self.condition_rates.keys()), p=list(self.condition_rates.values())
+        )
         split_index = np.random.randint(
             0,
             math.ceil(
                 len(other_tags)
                 # 条件部分に入る確率
-                * self.condition_rate
+                * condition_rate
                 # 版権的なものであれば条件部分のタグ数を減らす
                 / (
                     self.copyright_character_augmentation_rate

@@ -148,6 +148,7 @@ def filter_by_score(examples: Dataset, score_boundary: dict):
 
 def map_format_tags(examples: Dataset, composer: TagComposer):
     text_list = []
+    flags = []
 
     for i, id in enumerate(examples["id"]):
         general = examples["general"][i]
@@ -164,22 +165,29 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
 
         # parse and organize tags
         result = TAG_ORGANIZERS[identity_level].organize_tags(general)
-        components = composer.get_components_identity_keep(
-            rating=rating,
-            copyright=copyright,
-            character=character,
-            organizer_result=result,
-            image_width=image_width,
-            image_height=image_height,
-        )
+        try:
+            components = composer.get_components_identity_keep(
+                rating=rating,
+                copyright=copyright,
+                character=character,
+                organizer_result=result,
+                image_width=image_width,
+                image_height=image_height,
+            )
 
-        # format a prompt
-        prompt = format_sft(components, IDENTITY_LEVEL_TAGS[identity_level])
+            # format a prompt
+            prompt = format_sft(components, IDENTITY_LEVEL_TAGS[identity_level])
 
-        text_list.append(prompt)
+            text_list.append(prompt)
+            flags.append(True)
+        except Exception as e:
+            print(f"Failed to format tags: {e}")
+            text_list.append("")
+            flags.append(False)
 
     return {
         "text": text_list,
+        "is_ok": flags,
     }
 
 
@@ -261,6 +269,9 @@ def main():
         batched=True,
         num_proc=NUM_PROC,
     )
+
+    # remove failed
+    ds = ds.filter(lambda x: x["is_ok"], batched=False, num_proc=NUM_PROC)
 
     # tokenize
     ds = ds.map(
