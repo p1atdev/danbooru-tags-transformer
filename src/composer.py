@@ -49,7 +49,7 @@ class TagComposer:
     drop_people_rate: float
 
     # それぞれのクラスターかタグが条件グループに入る確率
-    condition_rate: float
+    condition_rates: dict[float, float]  # [割合: それになる確率]
     # 版権タグ、キャラクタータグがついているときに、条件とするタグの数を減らす確率
     copyright_character_augmentation_rate: float
 
@@ -57,14 +57,14 @@ class TagComposer:
         self,
         fuzzy_rating_tag_rate: float = 0.25,
         drop_people_rate: float = 0.1,
-        condition_rate: float = 0.5,
+        condition_rates: dict[float, float] = {0.5: 1.0},
         copyright_character_augmentation_rate: float = 1.25,
     ):
 
         self.fuzzy_rating_tag_rate = fuzzy_rating_tag_rate
         self.drop_people_rate = drop_people_rate
 
-        self.condition_rate = condition_rate
+        self.condition_rates = condition_rates
         self.copyright_character_augmentation_rate = (
             copyright_character_augmentation_rate
         )
@@ -88,27 +88,40 @@ class TagComposer:
         pre_tags.extend(organizer_result.people_tags)
         pre_tags.extend(organizer_result.focus_tags)
 
+        # ランダムにどの割合を選ぶか選択する
+        condition_rate = (
+            np.random.choice(
+                list(self.condition_rates.keys()),
+                p=list(self.condition_rates.values()),
+            )
+            / condition_augmentation_rate  # 条件グループに含める確率を上げる
+        )
+
+        # クラスターが一つだけの場合は、そのクラスター内で分割
         if len(organizer_result.other_tags) == 1:
-            # if there is only one cluster, randomly assign to post_tags
-            for tag in organizer_result.other_tags[0]:
-                if np.random.rand() < self.condition_rate:
-                    pre_tags.append(tag)
-                else:
-                    post_tags.append(tag)
+            # 0 から condition_rate の間で乱数をとり、その割合でタグを2グループに分ける
+            split_index = np.random.randint(
+                0,
+                math.ceil(len(organizer_result.other_tags[0]) * condition_rate),
+            )
+            pre_tags.extend(organizer_result.other_tags[0][:split_index])
+            post_tags.extend(organizer_result.other_tags[0][split_index:])
+
             return pre_tags, post_tags
 
-        for cluster_tags in organizer_result.other_tags:
-            # randomly assign to pre or post
-            if (
-                np.random.rand()
-                < self.condition_rate
-                / condition_augmentation_rate  # 条件グループに含める確率を上げる
-            ):
-                pre_tags.extend(cluster_tags)
-            else:
-                post_tags.extend(cluster_tags)
+        # クラスターが複数ある場合は、クラスターをグループ分け
+        split_index = np.random.randint(
+            0,
+            math.ceil(len(organizer_result.other_tags) * condition_rate),
+        )
+        condition_groups = organizer_result.other_tags[:split_index]
+        completion_groups = organizer_result.other_tags[split_index:]
 
-        # if post_tags is empty, set pre_tags to post_tags
+        # flatten して pre_tags, post_tags に追加
+        pre_tags.extend(sum(condition_groups, []))
+        post_tags.extend(sum(completion_groups, []))
+
+        # 補完されるグループがない場合は全てを補完グループに移す (そんなことは起こらないはず)
         if len(post_tags) == 0:
             post_tags = pre_tags
             pre_tags = []

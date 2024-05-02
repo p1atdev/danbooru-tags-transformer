@@ -19,19 +19,18 @@ class TagCluster:
     def train_from_embedding_model(
         cls,
         embedding_model_name: str,
-        model_type: str = "opt",
         n_clusters: int = 32,
         n_init: int = 10,
         max_iter: int = 1000,
+        trust_remote_code: bool = True,
     ):
         """Train a cluster map from an embedding model."""
 
         tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
-        model = AutoModel.from_pretrained(embedding_model_name)
-        if model_type == "opt":
-            embeddings = model.decoder.embed_tokens.weight.detach().cpu().numpy()
-        else:
-            raise NotImplementedError(f"Model type {model_type} not implemented.")
+        model = AutoModel.from_pretrained(
+            embedding_model_name, trust_remote_code=trust_remote_code
+        )
+        embeddings = model.get_input_embeddings().weight.detach().cpu().numpy()
 
         kmeans = KMeans(n_clusters=n_clusters, n_init=n_init, max_iter=max_iter)
         kmeans.fit(embeddings)

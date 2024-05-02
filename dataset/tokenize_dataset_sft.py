@@ -22,7 +22,7 @@ from tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
 
 MAX_LENGTH = 256
 
-PUSH_HUB_NAME = "p1atdev/dart-v2-20240427-sft"
+PUSH_HUB_NAME = "p1atdev/dart-v2-20240502-sft"
 SCORE_BOUNDARY = {
     "g": 1,  # about bottom 20%
     "s": 1,
@@ -36,14 +36,18 @@ DATASET_SPLIT = "train"
 
 TOKENIZER_NAME = "p1atdev/dart-v2-tokenizer"
 
-FUZZY_RATING_RATE = 0.25
+FUZZY_RATING_RATE = 0.3
 DROP_PEOPLE_RATE = 0.1
-CONDITION_RATE = 0.5
+CONDITION_RATES = {
+    0.75: 0.25,  # 25%の確率で0~75%のクラスターを条件にする
+    0.5: 0.25,  # 25%の確率で0~50%のクラスターを条件にする
+    0.25: 0.5,  # 50%の確率で0~25%のクラスターを条件にする
+}
 COPYRIGHT_CHARACTER_AUGMENTATION_RATE = 1.25
 IDENTITY_LEVEL_RATES = {
-    "lax": 0.25,
-    "strict": 0.25,
-    "none": 0.5,
+    # "none": 0.0, # ランダムな分割は行わない
+    "lax": 0.6,
+    "strict": 0.4,
 }
 
 NUM_PROC = 1
@@ -102,12 +106,12 @@ EMBEDDING_CLUSTERS = {
     ),
 }
 TAG_ORGANIZERS = {
-    "none": GroupTagOrganizer(DEFAULT_TAG_GROUP),
+    # "none": GroupTagOrganizer(DEFAULT_TAG_GROUP),
     "lax": ClusterTagOrganizer(DEFAULT_TAG_GROUP, EMBEDDING_CLUSTERS["lax"]),
     "strict": ClusterTagOrganizer(DEFAULT_TAG_GROUP, EMBEDDING_CLUSTERS["strict"]),
 }
 IDENTITY_LEVEL_TAGS = {
-    "none": IDENTITY_LEVEL_NONE,
+    # "none": IDENTITY_LEVEL_NONE,
     "lax": IDENTITY_LEVEL_LAX,
     "strict": IDENTITY_LEVEL_STRICT,
 }
@@ -185,7 +189,7 @@ def main():
     tag_composer = TagComposer(
         fuzzy_rating_tag_rate=FUZZY_RATING_RATE,
         drop_people_rate=DROP_PEOPLE_RATE,
-        condition_rate=CONDITION_RATE,
+        condition_rates=CONDITION_RATES,
         copyright_character_augmentation_rate=COPYRIGHT_CHARACTER_AUGMENTATION_RATE,
     )
 
