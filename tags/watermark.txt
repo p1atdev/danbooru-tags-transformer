@@ -13,7 +13,7 @@ web address
 pawoo username
 pixiv username
 pixiv id
-weibo username
+weibo watermark
 weibo logo
 fanbox username
 lofter username
