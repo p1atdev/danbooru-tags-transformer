@@ -4,13 +4,13 @@ import io
 from transformers import AutoTokenizer, AutoModel
 
 
-TOKENIZER_NAME = "p1atdev/dart2vec-opt_5"
-MODEL_NAME = "p1atdev/dart2vec-opt_5"
+TOKENIZER_NAME = "p1atdev/dart-v2-vectors"
+MODEL_NAME = "p1atdev/dart-v2-vectors"
 
 
 def prepare_embeddings():
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
-    model = AutoModel.from_pretrained(MODEL_NAME)
+    model = AutoModel.from_pretrained(MODEL_NAME, trust_remote_code=True)
     embeddings = model.decoder.embed_tokens.weight.detach().cpu().numpy()
 
     id2label = tokenizer.get_vocab()

@@ -2,30 +2,22 @@ from typing import Literal
 
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, PreTrainedTokenizerBase
+from optimum.onnxruntime import ORTModelForCausalLM
 
 import gradio as gr
 
 ALL_MODELS = {
-    "p1atdev/dart-v2-llama-100m": {
-        "type": "pretrain",
-    },
-    "p1atdev/dart-v2-mistral-80m": {
-        "type": "pretrain",
-    },
-    "p1atdev/dart-v2-mistral-100m": {
-        "type": "pretrain",
-    },
-    "p1atdev/dart-v2-mixtral-100m": {
-        "type": "pretrain",
-    },
-    "p1atdev/dart-v2-mixtral-160m": {
-        "type": "pretrain",
-    },
-    "p1atdev/dart-v2-llama-100m-sft": {
+    "p1atdev/dart-v2-sft": {
         "type": "sft",
     },
-    "p1atdev/dart-v2-mistral-100m-sft": {
+    "p1atdev/dart-v2-moe-sft": {
         "type": "sft",
+    },
+    "p1atdev/dart-v2-base": {
+        "type": "pretrain",
+    },
+    "p1atdev/dart-v2-moe-base": {
+        "type": "pretrain",
     },
 }
 
@@ -36,6 +28,7 @@ def prepare_models(model_name: str):
         model_name,
         torch_dtype=torch.bfloat16,
         device_map="auto",
+        # file_name="model_quantized.onnx",
     )
 
     return {
