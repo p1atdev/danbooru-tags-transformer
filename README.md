@@ -2,14 +2,16 @@
 
 Dart (**Da**nboo**r**u **T**ags Transformer) is a large language model that generates prompts for text-to-image models.
 
+SD WebUI extension is [here](https://github.com/p1atdev/sd-danbooru-tags-upsampler). Not this repository.
+
 ## v2
 
 |Name|Model architecture|Param size|Model type|Available on|
 |:-|-|-|-|-|
 |v2-moe-sft|Mixtral|166M|SFT model|[🤗 HuggingFace](https://huggingface.co/p1atdev/dart-v2-moe-sft)|
 |v2-moe-base|Mixtral|166M|Pretrained model|[🤗 HuggingFace](https://huggingface.co/p1atdev/dart-v2-moe-base)|
-|v2-sft|Mixtral|114M|SFT model|[🤗 HuggingFace](https://huggingface.co/p1atdev/dart-v2-sft)|
-|v2-base|Mixtral|114M|Pretrained model|[🤗 HuggingFace](https://huggingface.co/p1atdev/dart-v2-base)|
+|v2-sft|Mistral|114M|SFT model|[🤗 HuggingFace](https://huggingface.co/p1atdev/dart-v2-sft)|
+|v2-base|Mistral|114M|Pretrained model|[🤗 HuggingFace](https://huggingface.co/p1atdev/dart-v2-base)|
 |v2-vectors|-|-|Tag Embedding|[🤗 HuggingFace](https://huggingface.co/p1atdev/dart-v2-vectors)|
 
 
