@@ -1,0 +1,33 @@
+monochrome
+multiple monochrome
+greyscale
+sepia
+flat color
+muted color
+limited palette
+high contrast
+pale color
+
+greyscale with colored background
+spot color
+partially colored
+
+aqua theme
+black theme
+blue theme
+brown theme
+depression theme
+gold theme
+gradient theme
+green theme
+grey theme
+orange theme
+pink theme
+plaid theme
+playing card theme
+poke ball theme
+purple theme
+red theme
+split theme
+white theme
+yellow theme
