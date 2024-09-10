@@ -1,37 +1,136 @@
-signature
-logo
-dated
-artist name
-artist logo
-circle name
-company name
-copyright name
+alpha signature
 copyright notice
+signature
+username
+username tag
 watermark
+watermark grid
 sample watermark
-web address
-pawoo username
-pixiv username
-pixiv id
+too many watermarks
+
+
+miyoushe watermark
+photo date watermark
 weibo watermark
-weibo logo
+xiaohongshu watermark
+
+
+artist name
+artist name (singer)
+alternate name spelling
+circle name
+commissioner name
+copyright name
+company name
+editor name
+group name
+song name
+
+
+afdian username
+artstation username
+baidu username
+bcy username
+bilibili username
+blogger username
+blogspot username
+bluesky username
+boosty username
+deviantart username
+discord username
+enty username
+etsy username
+facebook username
 fanbox username
+fantia username
+fc2 username
+furaffinity username
+gumroad username
+hentai-foundry username
+hoyolab username
+inkbunny username
+instagram username
+ko-fi username
 lofter username
+mastodon username
+mihuashi username
+misskey.io username
+naver username
+newgrounds username
+niconico id
+nijie username
+patreon username
+pawoo username
+picarto username
+pixiv id
+pixiv username
+plurk username
 reddit username
+subscribestar username
+taittsuu username
+telegram id
+tiktok username
+toyhouse username
 tumblr username
 twitch username
 twitter username
-twitter logo
-gumroad username 
-patreon username
-patreon logo
-youtube username 
-facebook username 
-instagram username
+vgen username
+vkontakte username
+xiaohongshu id
+yahoo username
+youtube username
+
+
+ama usa an logo
+artist logo
+artstation logo
+bilibili logo
+blender logo
+boosty logo
+capcut logo
+company logo
+deviantart logo
+discord logo
+etsy logo
+facebook logo
+fanbox logo
+fanbox logo censor
+fantia logo
+furaffinity logo
+gumroad logo
+inkbunny logo
 instagram logo
-artstation username 
-deviantart username
-furaffinity username
-subscribestar username
-hentai-foundry username
-creator name
+kapwing logo
+kessoku band logo
+ko-fi logo
+lofter logo
+mastodon logo
+mihuashi logo
+misskey.io logo
+newgrounds logo
+niconico logo
+no ai logo
+onlyfans logo
+patreon logo
+patreon logo censor
+paypal logo
+pinterest logo
+pixiv logo
+playstation logo
+plurk logo
+reddit logo
+skeb logo
+skeb logo censor
+subscribestar logo
+telegram logo
+tiktok logo
+toyhouse logo
+tumblr logo
+twitch logo
+twitter logo
+twitter x logo
+vgen logo
+vkontakte logo
+weibo logo
+xiaohongshu logo
+youtube logo
