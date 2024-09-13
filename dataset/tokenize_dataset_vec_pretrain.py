@@ -7,16 +7,17 @@ from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 MAX_LENGTH = 256
 
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
-REVISION = "202403-at20240423"
+REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
 
 NUM_PROC = 40
 
 SEED = 12345
 
-DO_SHUFFLE = True
+DO_SHUFFLE = False
+PUSH_REPO_ID = "p1atdev/202408-at20240906-tokenized-unshuffle-1"
 
 
 def prepare_dataset():
@@ -89,9 +90,7 @@ def main():
         test_size=10000,
     )
 
-    ds.push_to_hub(
-        "p1atdev/202403-at20240423-tokenized-unshuffle", max_shard_size="4096MB"
-    )
+    ds.push_to_hub(PUSH_REPO_ID, max_shard_size="4096MB")
 
 
 if __name__ == "__main__":

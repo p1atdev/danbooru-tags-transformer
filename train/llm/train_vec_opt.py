@@ -14,15 +14,15 @@ from accelerate import Accelerator
 
 import wandb
 
-SEED = 20240419
+SEED = 20240913
 
-TOKENIZER_NAME = "p1atdev/dart-tokenizer-v2-encode"
+TOKENIZER_NAME = "p1atdev/dart-tokenizer-v3-240910"
 DATASET_NAME = "p1atdev/202403-at20240423-tokenized-shuffle"
 CONFIG_PATH = "./config/opt/125m.json"
 
-PROJECT_NAME = "dart2vec_opt_1"
-PUSH_HUB_NAME = "p1atdev/dart2vec-opt_8"
-SAVE_DIR = "./dart2vec_opt_8"
+PROJECT_NAME = "dart-v3-vectors"
+PUSH_HUB_NAME = "p1atdev/dart-v3-vectors-opt_1"
+SAVE_DIR = "./vec_opt_1"
 
 
 def prepare_models():
@@ -72,7 +72,7 @@ def main():
     train_args = TrainingArguments(
         output_dir=SAVE_DIR,
         overwrite_output_dir=True,
-        num_train_epochs=5,
+        num_train_epochs=10,
         # auto_find_batch_size=True,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
@@ -90,7 +90,7 @@ def main():
         eval_steps=1000,
         save_steps=1000,
         save_total_limit=2,
-        logging_steps=10,
+        logging_steps=1,
         logging_first_step=True,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
