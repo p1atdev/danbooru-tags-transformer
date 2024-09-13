@@ -1,0 +1,16 @@
+torch==2.4.1+cu124
+torchvision
+torchaudio
+--extra-index-url https://download.pytorch.org/whl/cu124
+
+accelerate
+transformers
+datasets
+hf-transfer
+
+# notebook
+jupyter
+ipykernel
+matplotlib
+seaborn
+
