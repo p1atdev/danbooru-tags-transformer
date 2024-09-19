@@ -1,26 +1,20 @@
 from .composer import PrompotComponents
 from .tags import (
-    BOS_TOKEN,
-    EOS_TOKEN,
-    COPYRIGHT_START,
-    COPYRIGHT_END,
-    CHARACTER_START,
-    CHARACTER_END,
-    GENERAL_START,
-    GENERAL_END,
-    INPUT_END,
+    CommonSpecialTokens,
+    TagCategoryTokens,
+    InstructionTokens,
 )
 
 
 def format_pretrain(components: PrompotComponents) -> str:
     """Format prompt for pretraining."""
     prompt = (
-        f"{BOS_TOKEN}"
-        f"{COPYRIGHT_START}{components.copyright}{COPYRIGHT_END}"
-        f"{CHARACTER_START}{components.character}{CHARACTER_END}"
+        f"{CommonSpecialTokens.BOS_TOKEN}"
+        f"{TagCategoryTokens.COPYRIGHT_START}{components.copyright}{TagCategoryTokens.COPYRIGHT_END}"
+        f"{TagCategoryTokens.CHARACTER_START}{components.character}{TagCategoryTokens.CHARACTER_END}"
         f"{components.rating}{components.aspect_ratio}{components.length}"
-        f"{GENERAL_START}{components.general_completion}{GENERAL_END}"  # no condition (input) part
-        f"{EOS_TOKEN}"
+        f"{TagCategoryTokens.GENERAL_START}{components.general_completion}{TagCategoryTokens.GENERAL_END}"  # no condition (input) part
+        f"{CommonSpecialTokens.EOS_TOKEN}"
     )
     return prompt
 
@@ -28,13 +22,13 @@ def format_pretrain(components: PrompotComponents) -> str:
 def format_sft(components: PrompotComponents, identity_level_tag: str) -> str:
     """Format prompt for SFT."""
     prompt = (
-        f"{BOS_TOKEN}"
-        f"{COPYRIGHT_START}{components.copyright}{COPYRIGHT_END}"
-        f"{CHARACTER_START}{components.character}{CHARACTER_END}"
+        f"{CommonSpecialTokens.BOS_TOKEN}"
+        f"{TagCategoryTokens.COPYRIGHT_START}{components.copyright}{TagCategoryTokens.COPYRIGHT_END}"
+        f"{TagCategoryTokens.CHARACTER_START}{components.character}{TagCategoryTokens.CHARACTER_END}"
         f"{components.rating}{components.aspect_ratio}{components.length}"
-        f"{GENERAL_START}{components.general_condition}"
-        f"{identity_level_tag}{INPUT_END}"
-        f"{components.general_completion}{GENERAL_END}"
-        f"{EOS_TOKEN}"
+        f"{TagCategoryTokens.GENERAL_START}{components.general_condition}"
+        f"{identity_level_tag}{InstructionTokens.INPUT_END}"
+        f"{components.general_completion}{TagCategoryTokens.GENERAL_END}"
+        f"{CommonSpecialTokens.EOS_TOKEN}"
     )
     return prompt

@@ -1,22 +1,18 @@
 from .tags import (
-    LENGTH_VERY_SHORT,
-    LENGTH_SHORT,
-    LENGTH_MEDIUM,
-    LENGTH_LONG,
-    LENGTH_VERY_LONG,
+    LengthTokens,
 )
 
 
 def get_length_tag(length: int):
     """Get the length tag from the length."""
 
-    if length < 10:
-        return LENGTH_VERY_SHORT
-    elif length < 20:
-        return LENGTH_SHORT
-    elif length < 30:
-        return LENGTH_MEDIUM
-    elif length < 40:
-        return LENGTH_LONG
+    if length < 7:
+        return LengthTokens.LENGTH_VERY_SHORT
+    elif length < 25:
+        return LengthTokens.LENGTH_SHORT
+    elif length < 32:
+        return LengthTokens.LENGTH_MEDIUM
+    elif length < 48:
+        return LengthTokens.LENGTH_LONG
     else:
-        return LENGTH_VERY_LONG
+        return LengthTokens.LENGTH_VERY_LONG

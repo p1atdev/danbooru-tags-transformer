@@ -1,9 +1,5 @@
 from .tags import (
-    ASPECT_RATIO_SQUARE,
-    ASPECT_RATIO_ULTRA_WIDE,
-    ASPECT_RATIO_WIDE,
-    ASPECT_RATIO_TALL,
-    ASPECT_RATIO_ULTRA_TALL,
+    AspectRatioTokens,
 )
 
 
@@ -12,12 +8,12 @@ def calculate_aspect_ratio_tag(width: int, height: int):
     aspect_ratio = width / height
 
     if aspect_ratio < 1 / 4:
-        return ASPECT_RATIO_ULTRA_TALL
+        return AspectRatioTokens.ASPECT_RATIO_ULTRA_TALL
     elif aspect_ratio < 8 / 9:  #
-        return ASPECT_RATIO_TALL
+        return AspectRatioTokens.ASPECT_RATIO_TALL
     elif aspect_ratio < 9 / 8:
-        return ASPECT_RATIO_SQUARE
+        return AspectRatioTokens.ASPECT_RATIO_SQUARE
     elif aspect_ratio < 4:
-        return ASPECT_RATIO_WIDE
+        return AspectRatioTokens.ASPECT_RATIO_WIDE
     else:
-        return ASPECT_RATIO_ULTRA_WIDE
+        return AspectRatioTokens.ASPECT_RATIO_ULTRA_WIDE

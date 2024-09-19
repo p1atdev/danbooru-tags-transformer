@@ -1,10 +1,15 @@
 import json
+from typing import Literal
 
-from sklearn.cluster import KMeans
+import numpy as np
+from sklearn.cluster import KMeans as SklearnKMeans
 from transformers import AutoTokenizer, AutoModel
+from faiss import Kmeans as FaissKmeans
 
 
 CLUSTER_MAP_TYPE = dict[str, int]
+
+CLUSTRING_ALGORITHM = Literal["sklearn", "faiss"]
 
 
 class TagCluster:
@@ -23,6 +28,7 @@ class TagCluster:
         n_init: int = 10,
         max_iter: int = 1000,
         trust_remote_code: bool = True,
+        algorithm: CLUSTRING_ALGORITHM = "sklearn",
     ):
         """Train a cluster map from an embedding model."""
 
@@ -30,13 +36,31 @@ class TagCluster:
         model = AutoModel.from_pretrained(
             embedding_model_name, trust_remote_code=trust_remote_code
         )
-        embeddings = model.get_input_embeddings().weight.detach().cpu().numpy()
+        embeddings: np.ndarray = (
+            model.get_input_embeddings().weight.detach().cpu().numpy()
+        )
 
-        kmeans = KMeans(n_clusters=n_clusters, n_init=n_init, max_iter=max_iter)
-        kmeans.fit(embeddings)
+        if algorithm == "sklearn":
+            kmeans = SklearnKMeans(
+                n_clusters=n_clusters, n_init=n_init, max_iter=max_iter
+            )
+            kmeans.fit(embeddings)
+            labels = kmeans.labels_
+        elif algorithm == "faiss":
+            kmeans = FaissKmeans(
+                d=embeddings.shape[1],
+                k=n_clusters,
+                niter=max_iter,
+                nredo=n_init,
+            )
+            kmeans.train(embeddings)
+            _distance, ids = kmeans.index.search(embeddings, 1)
+            labels = ids.flatten()
+        else:
+            raise ValueError(f"Invalid algorithm: {algorithm}")
 
         cluster_map = {
-            label: int(kmeans.labels_[token_id])
+            label: int(labels[token_id])
             for label, token_id in tokenizer.get_vocab().items()
         }
 

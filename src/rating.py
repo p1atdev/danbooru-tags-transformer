@@ -1,28 +1,23 @@
 from typing import Literal, Union
 
 from .tags import (
-    RATING_GENERAL,
-    RATING_SENSITIVE,
-    RATING_QUESTIONABLE,
-    RATING_EXPLICIT,
-    RATING_SFW,
-    RATING_NSFW,
+    RatingTokens,
 )
 
 SHORT_RATING_TAG = Literal["g", "s", "q", "e"]
 
 LONG_RATING_TAG_MAP: dict[SHORT_RATING_TAG, str] = {
-    "g": RATING_GENERAL,
-    "s": RATING_SENSITIVE,
-    "q": RATING_QUESTIONABLE,
-    "e": RATING_EXPLICIT,
+    "g": RatingTokens.RATING_GENERAL,
+    "s": RatingTokens.RATING_SENSITIVE,
+    "q": RatingTokens.RATING_QUESTIONABLE,
+    "e": RatingTokens.RATING_EXPLICIT,
 }
 
 AMBITIOUS_RATING_TAG_MAP: dict[SHORT_RATING_TAG, str] = {
-    "g": RATING_SFW,
-    "s": RATING_SFW,
-    "q": RATING_NSFW,
-    "e": RATING_NSFW,
+    "g": RatingTokens.RATING_SFW,
+    "s": RatingTokens.RATING_SFW,
+    "q": RatingTokens.RATING_NSFW,
+    "e": RatingTokens.RATING_NSFW,
 }
 
 
