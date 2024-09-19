@@ -1,6 +1,9 @@
 import math
 
+from enum import Enum
+from typing import Tuple
 from dataclasses import dataclass
+import json
 
 import numpy as np
 
@@ -8,6 +11,7 @@ from .organizer import TagOrganizerResult
 from .rating import get_rating_tag, get_ambitious_rating_tag, SHORT_RATING_TAG
 from .aspect_ratio import calculate_aspect_ratio_tag
 from .length import get_length_tag
+from .cluster import TagCluster
 
 
 @dataclass
@@ -42,321 +46,153 @@ class PrompotComponents:
     length: str
 
 
-class TagComposer:
-    # rating タグをあいまいにする確率
-    fuzzy_rating_tag_rate: float
-    # 人物タグを条件部分に入れ**ない**確率
-    drop_people_rate: float
+class PredefinedTagType(Enum):
+    # 含まれていたらそのデータ全体を使わない
+    BAN = "ban"
+    # 削除
+    REMOVE = "remove"
+    # 先頭に挿入
+    INSERT_START = "insert_start"
 
-    # それぞれのクラスターかタグが条件グループに入る確率
-    condition_rates: dict[float, float]  # [割合: それになる確率]
-    # 版権タグ、キャラクタータグがついているときに、条件とするタグの数を減らす確率
-    copyright_character_augmentation_rate: float
+
+class PredefinedTags:
+    """
+    事前に指定したタグの管理をおこなうクラス
+    """
+
+    # タグのリスト
+    tags: list[str]
+
+    def __init__(self, tags: list[str]):
+        self.tags = tags
+
+    # テキストファイルから読み込む
+    @classmethod
+    def from_txt_file(cls, path: str):
+        with open(path, "r") as f:
+            tags = f.readlines()
+            tags = [tag.strip() for tag in tags if tag.strip()]
+        return cls(tags)
+
+
+# 出現頻度を計算するクラス
+class TagFrequency:
+    # タグ名と出現回数の辞書
+    tag_to_frequency: dict[str, int]
+
+    def __init__(self, tag_to_frequency: dict[str, int]):
+        self.tag_to_frequency = tag_to_frequency
+
+    # テキストファイルから読み込む
+    @classmethod
+    def from_json(cls, path: str):
+        with open(path, "r") as f:
+            tag_to_frequency = json.load(f)
+        return cls(tag_to_frequency)
+
+
+# タグの順序を整理するクラス
+class TagSorter:
+    # タグ名と最適な絶対位置インデックスの辞書
+    tag_to_position: dict[str, int]
+
+    # 手動で設定するタグのリスト
+    high_priority_groups: list[PredefinedTags]
 
     def __init__(
         self,
-        fuzzy_rating_tag_rate: float = 0.25,
-        drop_people_rate: float = 0.1,
-        condition_rates: dict[float, float] = {0.5: 1.0},
-        copyright_character_augmentation_rate: float = 1.25,
+        cluster: TagCluster,
+        frequency: TagFrequency,
+        high_priority_groups: list[PredefinedTags],
     ):
+        self.high_priority_groups = high_priority_groups
+        self.tag_to_position = self.calculate_rankings(cluster, frequency)
 
-        self.fuzzy_rating_tag_rate = fuzzy_rating_tag_rate
-        self.drop_people_rate = drop_people_rate
+    def calculate_rankings(self, cluster: TagCluster, frequency: TagFrequency):
+        cluster_list: dict[int, list[str]] = {}
+        cluster_avg_freq: dict[int, float] = {}
 
-        self.condition_rates = condition_rates
-        self.copyright_character_augmentation_rate = (
-            copyright_character_augmentation_rate
-        )
+        # クラスターごとにタグを分類
+        for tag, cluster_id in cluster.cluster_map.items():
+            if cluster_id not in cluster_list:
+                cluster_list[cluster_id] = []
+            if tag in frequency.tag_to_frequency:
+                cluster_list[cluster_id].append(tag)
 
-    def recompose_tags(
-        self,
-        organizer_result: TagOrganizerResult,
-        condition_augmentation_rate: float = 1.0,  # 条件グループへの入りやすさ
-    ) -> tuple[list[str], list[str]]:
-        """
-        Recompose tags by group and cluster.
+        # クラスターごとの平均出現頻度を計算
+        for cluster_id, tags in cluster_list.items():
+            if len(tags) == 0:
+                cluster_avg_freq[cluster_id] = -1
+                continue
 
-        This keeps the identity of a character in the prompt.
-        """
+            cluster_avg_freq[cluster_id] = sum(
+                [frequency.tag_to_frequency[tag] for tag in tags]
+            ) / len(tags)
 
-        # result = self.organizer.organize_tags(tags)
-
-        pre_tags = []
-        post_tags = []
-
-        pre_tags.extend(organizer_result.people_tags)
-        pre_tags.extend(organizer_result.focus_tags)
-
-        # ランダムにどの割合を選ぶか選択する
-        condition_rate = (
-            np.random.choice(
-                list(self.condition_rates.keys()),
-                p=list(self.condition_rates.values()),
+        # クラスターidと平均出現頻度の順位を計算
+        cluster_ranking: dict[int, int] = {}
+        sorted_cluster_avg_freq = sorted(cluster_avg_freq.values(), key=lambda x: -x)
+        for cluster_id in cluster_avg_freq.keys():
+            cluster_ranking[cluster_id] = sorted_cluster_avg_freq.index(
+                cluster_avg_freq[cluster_id]
             )
-            / condition_augmentation_rate  # 条件グループに含める確率を上げる
+
+        # クラスター内でタグの順位を計算
+        in_cluster_ranking: dict[str, int] = {}
+        for cluster_id, tags in cluster_list.items():
+            tags = sorted(
+                tags, key=lambda x: -frequency.tag_to_frequency[x]
+            )  # 出現頻度が高い順にソート
+            for i, tag in enumerate(tags):
+                # クラスター内のタグの順位を計算
+                in_cluster_ranking[tag] = i
+
+        # タグの順位を計算
+        tag_to_position = {}
+        sorted_cluster_id_to_position = sorted(
+            cluster_ranking.items(), key=lambda x: x[1]
         )
-        assert condition_rate != 0, f"condition_rate is 0: from {self.condition_rates}"
-
-        if len(organizer_result.other_tags) == 0:
-            raise ValueError(f"No tags to complete!: {organizer_result}")
-
-        # クラスターが一つだけの場合は、そのクラスター内で分割
-        if len(organizer_result.other_tags) == 1:
-            # 0 から condition_rate の間で乱数をとり、その割合でタグを2グループに分ける
-            split_index = np.random.randint(
-                0,
-                math.ceil(len(organizer_result.other_tags[0]) * condition_rate),
+        for [cluster_id, position] in sorted_cluster_id_to_position:
+            cluster_tags = cluster_list[cluster_id]
+            sorted_cluster_tags = sorted(
+                cluster_tags, key=lambda x: in_cluster_ranking[x]
             )
-            pre_tags.extend(organizer_result.other_tags[0][:split_index])
-            post_tags.extend(organizer_result.other_tags[0][split_index:])
+            for i, tag in enumerate(sorted_cluster_tags):
+                tag_to_position[tag] = i + position
 
-            return pre_tags, post_tags
+        return tag_to_position
 
-        # クラスターが複数ある場合は、クラスターをグループ分け
-        split_index = np.random.randint(
-            0,
-            math.ceil(len(organizer_result.other_tags) * condition_rate),
-        )
-        condition_groups = organizer_result.other_tags[:split_index]
-        completion_groups = organizer_result.other_tags[split_index:]
+    def sort_tags(
+        self, tags: list[str]
+    ) -> Tuple[list[str], list[list[str]], list[str]]:
+        high_priorities: list[list[str]] = []
+        remains: list[str] = tags.copy()
 
-        # flatten して pre_tags, post_tags に追加
-        pre_tags.extend(sum(condition_groups, []))
-        post_tags.extend(sum(completion_groups, []))
+        for i, group in enumerate(self.high_priority_groups):
+            high_priorities.append([])
 
-        # 補完されるグループがない場合は全てを補完グループに移す (そんなことは起こらないはず)
-        if len(post_tags) == 0:
-            post_tags = pre_tags
-            pre_tags = []
+            for tag in remains:
+                if tag in group.tags:
+                    high_priorities[i].append(tag)
+                    remains.remove(tag)
+                    continue
 
-        return pre_tags, post_tags
+        # sort remains with tag_to_position
+        on_list: list[str] = []
+        not_on_list: list[str] = []
+        for tag in remains:
+            if tag in self.tag_to_position:
+                on_list.append(tag)
+            else:
+                not_on_list.append(tag)
+        on_list.sort(key=lambda x: self.tag_to_position[x])
 
-    def get_common_tags(
+        return (on_list, high_priorities, not_on_list)
+
+
+class TagComposer:
+
+    def __init__(
         self,
-        rating: SHORT_RATING_TAG,
-        general: list[str],
-        image_width: int,
-        image_height: int,
     ):
-        """Get common tags in the prompt."""
-
-        length_tag = get_length_tag(len(general))
-        rating_tag = (
-            get_ambitious_rating_tag(rating)
-            if np.random.rand() < self.fuzzy_rating_tag_rate
-            else get_rating_tag(rating)
-        )
-        aspect_ratio_tag = calculate_aspect_ratio_tag(image_width, image_height)
-
-        return CommonTags(
-            length_tag=length_tag,
-            rating_tag=rating_tag,
-            aspect_ratio_tag=aspect_ratio_tag,
-        )
-
-    def get_keep_identity_condition_part(
-        self,
-        copyright: list[str],
-        character: list[str],
-        organizer_result: TagOrganizerResult,
-    ):
-        # なにかしらの版権テーマ
-        is_copyright_character = len(
-            [tag for tag in copyright if tag != "original"]
-        ) > 0 and len(character)
-
-        # keep identity
-        pre_tags, post_tags = self.recompose_tags(
-            organizer_result,
-            (
-                # 版権かキャラクタータグがあれば条件部分のタグ数を減らす
-                self.copyright_character_augmentation_rate
-                if is_copyright_character
-                else 1.0
-            ),
-        )
-
-        # shuffle pre_tags
-        np.random.shuffle(pre_tags)
-        # sort post_tags
-        post_tags = sorted(post_tags)
-
-        # shuffle copyright and character tags
-        np.random.shuffle(copyright)
-        np.random.shuffle(character)
-
-        return ConditionTags(
-            copyright_part=copyright,
-            character_part=character,
-            pre_general_part=pre_tags,
-            post_general_part=post_tags,
-        )
-
-    def get_free_condition_part(
-        self,
-        copyright: list[str],
-        character: list[str],
-        organizer_result: TagOrganizerResult,
-    ):
-        other_tags = sum(organizer_result.other_tags, [])  # just flatten
-
-        # なにかしらの版権テーマ
-        is_copyright_character = len(
-            [tag for tag in copyright if tag != "original"]
-        ) > 0 and len(character)
-
-        # randomly split result.other_tags
-        np.random.shuffle(other_tags)
-        condition_rate = np.random.choice(
-            list(self.condition_rates.keys()), p=list(self.condition_rates.values())
-        )
-        split_index = np.random.randint(
-            0,
-            math.ceil(
-                len(other_tags)
-                # 条件部分に入る確率
-                * condition_rate
-                # 版権的なものであれば条件部分のタグ数を減らす
-                / (
-                    self.copyright_character_augmentation_rate
-                    if is_copyright_character
-                    else 1.0
-                )
-            ),
-        )
-        pre_part = other_tags[:split_index]
-        post_part = other_tags[split_index:]
-
-        # drop people tags
-        if np.random.rand() < self.drop_people_rate:
-            post_part.extend(organizer_result.people_tags + organizer_result.focus_tags)
-        else:
-            pre_part.extend(organizer_result.people_tags + organizer_result.focus_tags)
-
-        # shuffle pre_part
-        np.random.shuffle(pre_part)
-        # sort post_part
-        post_part = sorted(post_part)
-
-        # shuffle copyright and character tags
-        np.random.shuffle(copyright)
-        np.random.shuffle(character)
-
-        return ConditionTags(
-            copyright_part=copyright,
-            character_part=character,
-            pre_general_part=pre_part,
-            post_general_part=post_part,
-        )
-
-    def get_components_identity_keep(
-        self,
-        rating: SHORT_RATING_TAG,
-        copyright: list[str],
-        character: list[str],
-        organizer_result: TagOrganizerResult,
-        image_width: int,
-        image_height: int,
-    ):
-        """Get prompt components with keeping identity."""
-
-        common = self.get_common_tags(
-            rating=rating,
-            general=organizer_result.people_tags
-            + organizer_result.focus_tags
-            + sum(organizer_result.other_tags, []),  # just flatten,
-            image_width=image_width,
-            image_height=image_height,
-        )
-
-        condition = self.get_keep_identity_condition_part(
-            copyright=copyright,
-            character=character,
-            organizer_result=organizer_result,
-        )
-
-        return PrompotComponents(
-            copyright=", ".join(condition.copyright_part),
-            character=", ".join(condition.character_part),
-            general_condition=", ".join(condition.pre_general_part),
-            general_completion=", ".join(condition.post_general_part),
-            rating=common.rating_tag,
-            aspect_ratio=common.aspect_ratio_tag,
-            length=common.length_tag,
-        )
-
-    def get_components_identity_free(
-        self,
-        rating: SHORT_RATING_TAG,
-        copyright: list[str],
-        character: list[str],
-        organizer_result: TagOrganizerResult,
-        image_width: int,
-        image_height: int,
-    ):
-        """Get prompt components without keeping identity."""
-
-        common = self.get_common_tags(
-            rating=rating,
-            general=organizer_result.people_tags
-            + organizer_result.focus_tags
-            + sum(organizer_result.other_tags, []),  # just flatten
-            image_width=image_width,
-            image_height=image_height,
-        )
-
-        condition = self.get_free_condition_part(
-            copyright=copyright,
-            character=character,
-            organizer_result=organizer_result,
-        )
-
-        return PrompotComponents(
-            copyright=", ".join(condition.copyright_part),
-            character=", ".join(condition.character_part),
-            general_condition=", ".join(condition.pre_general_part),
-            general_completion=", ".join(condition.post_general_part),
-            rating=common.rating_tag,
-            aspect_ratio=common.aspect_ratio_tag,
-            length=common.length_tag,
-        )
-
-    def get_components(
-        self,
-        rating: SHORT_RATING_TAG,
-        copyright: list[str],
-        character: list[str],
-        organizer_result: TagOrganizerResult,
-        image_width: int,
-        image_height: int,
-    ):
-        """Get prompt components."""
-
-        general = (
-            organizer_result.people_tags
-            + organizer_result.focus_tags
-            + sum(organizer_result.other_tags, [])
-        )
-
-        common = self.get_common_tags(
-            rating=rating,
-            general=general,
-            image_width=image_width,
-            image_height=image_height,
-        )
-
-        # sort tags
-        copyright = sorted(copyright)
-        character = sorted(character)
-        general = sorted(general)
-
-        return PrompotComponents(
-            copyright=", ".join(copyright),
-            character=", ".join(character),
-            general_condition="",
-            general_completion=", ".join(general),
-            rating=common.rating_tag,
-            aspect_ratio=common.aspect_ratio_tag,
-            length=common.length_tag,
-        )
+        pass

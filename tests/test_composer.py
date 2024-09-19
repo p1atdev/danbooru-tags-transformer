@@ -5,7 +5,13 @@ sys.path.append(".")
 from src.group import TagGroup
 from src.cluster import TagCluster
 from src.organizer import GroupTagOrganizer
-from src.composer import TagComposer
+from src.composer import (
+    TagComposer,
+    PredefinedTags,
+    PredefinedTagType,
+    TagFrequency,
+    TagSorter,
+)
 
 KEEP_IDENTITY_TOKEN = "<|keep_identity|>"
 
@@ -18,147 +24,79 @@ def test_composer():
     assert tag_composer is not None
 
 
-def test_composer_recompose_tags():
-    organizer = GroupTagOrganizer(group)
+def test_load_predifined_tags():
+    artistic_error_tags = PredefinedTags.from_txt_file("tags/artistic_error.txt")
+    assert artistic_error_tags.tags
 
-    tag_composer = TagComposer()
+    background_tags = PredefinedTags.from_txt_file("tags/background.txt")
+    assert background_tags.tags
 
-    result = organizer.organize_tags(
-        [
-            "1girl",  # people tag
-            "solo",  # focus tag
-            "solo focus",  # focus tag
-            "blonde hair",  # other tag
-            "bad anatomy",  # artistic error tag
-            "watermark",  # watermark tag
-        ]
+    ban_meta_tags = PredefinedTags.from_txt_file("tags/ban_meta.txt")
+    assert ban_meta_tags.tags
+
+    color_theme_tags = PredefinedTags.from_txt_file("tags/color_theme.txt")
+    assert color_theme_tags.tags
+
+    displeasing_meta_tags = PredefinedTags.from_txt_file("tags/displeasing_meta.txt")
+    assert displeasing_meta_tags.tags
+
+    focus_tags = PredefinedTags.from_txt_file("tags/focus.txt")
+    assert focus_tags.tags
+
+    people_tags = PredefinedTags.from_txt_file("tags/people.txt")
+    assert people_tags.tags
+
+    usable_meta_tags = PredefinedTags.from_txt_file("tags/usable_meta.txt")
+    assert usable_meta_tags.tags
+
+    watermark_tags = PredefinedTags.from_txt_file("tags/watermark.txt")
+    assert watermark_tags.tags
+
+
+def test_tag_sorter():
+    cluster = TagCluster.from_pretrained("data/cluster_map_1440c2.json")
+    frequency = TagFrequency.from_json("data/tag_frequency.json")
+
+    sorter = TagSorter(
+        cluster,
+        frequency,
+        high_priority_groups=[
+            PredefinedTags.from_txt_file("tags/people.txt"),
+            PredefinedTags.from_txt_file("tags/background.txt"),
+            PredefinedTags.from_txt_file("tags/watermark.txt"),
+            PredefinedTags.from_txt_file("tags/artistic_error.txt"),
+        ],
     )
 
-    pre_tags, post_tags = tag_composer.recompose_tags(result)
+    tags = (
+        "watermark, absurdres, simple background, "
+        "upper body, shirt, sky, green hair, "
+        "short hair, solo, smile, 1girl, "
+        "signature, bad anatomy, "
+        "iseri nina"
+    ).split(", ")
+    sorted_tags, excluded, other = sorter.sort_tags(tags)
 
-    assert "1girl" in pre_tags
-    assert "watermark" not in pre_tags and "watermark" not in post_tags
+    print(sorted_tags)
+    print(excluded)
+    print(other)
 
-
-def test_composer_get_common_tags():
-    tag_composer = TagComposer(
-        fuzzy_rating_tag_rate=0,
-    )
-
-    common = tag_composer.get_common_tags(
-        rating="g",
-        general=["1girl", "cat ears"],
-        image_width=896,
-        image_height=1152,
-    )
-
-    assert common.length_tag == "<|length:very_short|>"
-    assert common.rating_tag == "<|rating:general|>"
-    assert common.aspect_ratio_tag == "<|aspect_ratio:tall|>"
-
-
-def test_composer_get_common_tags_with_fuzzy_rating_tag():
-    tag_composer = TagComposer(fuzzy_rating_tag_rate=1)
-
-    common = tag_composer.get_common_tags(
-        rating="g",
-        general=["1girl", "cat ears"],
-        image_width=896,
-        image_height=1152,
-    )
-
-    assert common.rating_tag == "<|rating:sfw|>"
-
-
-def test_composer_get_keep_identity_condition_part():
-    organizer = GroupTagOrganizer(group)
-
-    tag_composer = TagComposer(fuzzy_rating_tag_rate=0)
-
-    result = organizer.organize_tags(["1girl", "cat ears"])
-
-    common = tag_composer.get_keep_identity_condition_part(
-        copyright=["vocaloid"],
-        character=["hatsune miku"],
-        organizer_result=result,
-    )
-
-    assert common.copyright_part == ["vocaloid"]
-    assert common.character_part == ["hatsune miku"]
-    assert "1girl" in common.pre_general_part
-
-
-def test_composer_get_free_condition_part():
-    organizer = GroupTagOrganizer(group)
-
-    tag_composer = TagComposer(
-        fuzzy_rating_tag_rate=0,
-        drop_people_rate=0,
-    )
-
-    result = organizer.organize_tags(["1girl", "cat ears", "blue hair"])
-
-    common = tag_composer.get_free_condition_part(
-        copyright=["vocaloid"],
-        character=["hatsune miku"],
-        organizer_result=result,
-    )
-
-    assert common.copyright_part == ["vocaloid"]
-    assert common.character_part == ["hatsune miku"]
-    assert "1girl" in common.pre_general_part
-    assert common.post_general_part == sorted(common.post_general_part)
-
-
-def test_composer_get_components_identity_keep():
-    organizer = GroupTagOrganizer(group)
-
-    tag_composer = TagComposer(
-        fuzzy_rating_tag_rate=0,
-        drop_people_rate=0,
-    )
-
-    result = organizer.organize_tags(["1girl", "cat ears", "blue hair"])
-
-    components = tag_composer.get_components_identity_keep(
-        rating="g",
-        copyright=["aaa"],
-        character=["bbb"],
-        organizer_result=result,
-        image_width=896,
-        image_height=1152,
-    )
-
-    assert components.copyright == "aaa"
-    assert components.character == "bbb"
-    assert components.rating == "<|rating:general|>"
-    assert components.aspect_ratio == "<|aspect_ratio:tall|>"
-    assert components.length == "<|length:very_short|>"
-    assert "1girl" in components.general_condition
-
-
-def test_composer_get_components_identity_free():
-    organizer = GroupTagOrganizer(group)
-
-    tag_composer = TagComposer(
-        fuzzy_rating_tag_rate=0,
-        drop_people_rate=0,
-    )
-
-    result = organizer.organize_tags(["1girl", "cat ears", "blue hair"])
-
-    components = tag_composer.get_components_identity_free(
-        rating="g",
-        copyright=["aaa"],
-        character=["bbb"],
-        organizer_result=result,
-        image_width=896,
-        image_height=1152,
-    )
-
-    assert components.copyright == "aaa"
-    assert components.character == "bbb"
-    assert components.rating == "<|rating:general|>"
-    assert components.aspect_ratio == "<|aspect_ratio:tall|>"
-    assert components.length == "<|length:very_short|>"
-    assert "1girl" in components.general_condition
+    assert sorted_tags == [
+        "short hair",
+        "green hair",
+        "absurdres",
+        "shirt",
+        "solo",
+        "smile",
+        "upper body",
+        "sky",
+    ]
+    assert excluded == [
+        ["1girl"],
+        ["simple background"],
+        ["watermark", "signature"],
+        ["bad anatomy"],
+    ]
+    assert other == [
+        "iseri nina",
+    ]
