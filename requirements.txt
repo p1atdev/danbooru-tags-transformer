@@ -8,6 +8,8 @@ transformers
 datasets
 hf-transfer
 
+wandb
+
 # notebook
 jupyter
 ipykernel
