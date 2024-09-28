@@ -3,13 +3,33 @@ import json
 import gradio as gr
 
 CLUSTER = {
-    "256": {
-        "path": "data/cluster_map_256c.json",
+    "1024-1": {
+        "path": "data/cluster_map_1024c1.json",
         "label2cluster": None,
         "cluster2labels": None,
     },
-    "512": {
-        "path": "data/cluster_map_512c.json",
+    "1440-3": {
+        "path": "data/cluster_map_1440c3.json",
+        "label2cluster": None,
+        "cluster2labels": None,
+    },
+    # "1440-4": {
+    #     "path": "data/cluster_map_1440c4.json",
+    #     "label2cluster": None,
+    #     "cluster2labels": None,
+    # },
+    # "1600": {
+    #     "path": "data/cluster_map_1600c.json",
+    #     "label2cluster": None,
+    #     "cluster2labels": None,
+    # },
+    "1600-2": {
+        "path": "data/cluster_map_1600c2.json",
+        "label2cluster": None,
+        "cluster2labels": None,
+    },
+    "1600-3": {
+        "path": "data/cluster_map_1600c3.json",
         "label2cluster": None,
         "cluster2labels": None,
     },
@@ -30,10 +50,10 @@ def prepare_cluster_map(id: str):
 
 
 def demo():
-    prepare_cluster_map("256")
-    prepare_cluster_map("512")
+    for key in CLUSTER:
+        prepare_cluster_map(key)
 
-    def get_same_cluster(tag: str, cluster: str = "256"):
+    def get_same_cluster(tag: str, cluster: str = "1024"):
         if tag not in CLUSTER[cluster]["label2cluster"]:
             return f"Unknown tag: {tag}"
 
@@ -52,8 +72,8 @@ def demo():
                 )
                 cluster_radio = gr.Radio(
                     label="Cluster size",
-                    choices=["256", "512"],
-                    value="256",
+                    choices=list(CLUSTER.keys()),
+                    value=list(CLUSTER.keys())[0],
                 )
 
                 gr.Examples(
@@ -74,7 +94,7 @@ def demo():
             with gr.Column():
                 similar_tags_label = gr.Label(
                     label="Tags in the same cluster",
-                    value=get_same_cluster("blue hair", "256"),
+                    value=get_same_cluster("blue hair", list(CLUSTER.keys())[0]),
                 )
 
         tag_input.change(
