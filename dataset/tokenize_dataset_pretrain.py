@@ -5,29 +5,28 @@ sys.path.append(".")
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
-from src.group import TagGroup
-from src.organizer import GroupTagOrganizer
-from src.composer import TagComposer
-from src.formatter import format_pretrain
+from src.composer import TagComposer, TagCluster, TagFrequency
 
 MAX_LENGTH = 256
 
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
-REVISION = "202403-at20240422"
+REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-v2-tokenizer"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
+FREQUENCY_PATH = "data/tag_frequency.json"
+CLUSTER_PATH = "data/cluster_map_1024c2.json"
 
-FUZZY_RATING_RATE = 0.25
+PUSH_ID = "p1atdev/dart-v3-20241003-pretrain"
+
+TEMPERATURE = 1.0
+CONDITION_RATE = 0.0
 
 NUM_PROC = 40
 
 SEED = 12345
 
-DEBUG = True
-
-TAG_GROUP = TagGroup()
-TAG_ORGANIZER = GroupTagOrganizer(TAG_GROUP)
+DEBUG = False
 
 
 def prepare_dataset():
@@ -47,19 +46,34 @@ def map_split_tags(examples: Dataset, tokenizer: PreTrainedTokenizer):
     general_list = []
     character_list = []
     copyright_list = []
+    meta_list = []
 
     for i, id in enumerate(examples["id"]):
         general: str = examples["general"][i]
         character: str = examples["character"][i]
         copyright: str = examples["copyright"][i]
+        meta: str = examples["meta"][i]
 
         if character is None:
-            character = ""
+            character_tags = []
+        else:
+            character_tags = [
+                tag.strip() for tag in character.split(", ") if tag.strip() != ""
+            ]
         if copyright is None:
-            copyright = ""
+            copyright_tags = []
+        else:
+            copyright_tags = [
+                tag.strip() for tag in copyright.split(", ") if tag.strip() != ""
+            ]
+        if meta is None:
+            meta_tags = []
+        else:
+            meta_tags = [tag.strip() for tag in meta.split(", ") if tag.strip() != ""]
 
-        character_list.append((character).split(", "))
-        copyright_list.append((copyright).split(", "))
+        character_list.append(character_tags)
+        copyright_list.append(copyright_tags)
+        meta_list.append(meta_tags)
 
         # encode general tags and remove unk tokens, then decode
         general_token_ids = tokenizer.encode_plus(
@@ -77,6 +91,7 @@ def map_split_tags(examples: Dataset, tokenizer: PreTrainedTokenizer):
         "general": general_list,
         "character": character_list,
         "copyright": copyright_list,
+        "meta": meta_list,
     }
 
 
@@ -84,25 +99,17 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
     text_list = []
 
     for i, id in enumerate(examples["id"]):
-        general = examples["general"][i]
-        character = examples["character"][i]
-        copyright = examples["copyright"][i]
-        rating = examples["rating"][i]
-        image_width = examples["image_width"][i]
-        image_height = examples["image_height"][i]
-
-        result = TAG_ORGANIZER.organize_tags(general)
-        components = composer.get_components(
-            rating=rating,
-            copyright=copyright,
-            character=character,
-            organizer_result=result,
-            image_width=image_width,
-            image_height=image_height,
+        prompt = composer.compose_pretrain_list(
+            general_tags=examples["general"][i],
+            copyright_tags=examples["copyright"][i],
+            character_tags=examples["character"][i],
+            meta_tags=examples["meta"][i],
+            rating=examples["rating"][i],
+            image_width=examples["image_width"][i],
+            image_height=examples["image_height"][i],
+            temperature=TEMPERATURE,
+            condition_rate=CONDITION_RATE,
         )
-
-        prompt = format_pretrain(components)
-
         text_list.append(prompt)
 
     return {
@@ -111,23 +118,23 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
 
 
 def map_tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
-    input_ids_list = []
-
-    for tag in example["text"]:
-        input_ids = tokenizer(tag, padding=False, truncation=False).input_ids
-
-        input_ids_list.append(input_ids)
+    tokenized = tokenizer(example["text"])
+    input_ids = tokenized["input_ids"]
 
     return {
-        "input_ids": input_ids_list,
+        "input_ids": input_ids,
     }
 
 
 def main():
     set_seed(SEED)
 
+    cluster = TagCluster.from_pretrained(CLUSTER_PATH)
+    freq = TagFrequency.from_json(FREQUENCY_PATH)
+
     tag_composer = TagComposer(
-        fuzzy_rating_tag_rate=FUZZY_RATING_RATE,
+        cluster=cluster,
+        frequency=freq,
     )
 
     ds = prepare_dataset()
@@ -174,13 +181,14 @@ def main():
 
     # split tags
     ds = ds.map(
-        lambda x: map_split_tags(x, tokenizer),
+        map_split_tags,
         batched=True,
         num_proc=NUM_PROC,
+        fn_kwargs={"tokenizer": tokenizer},
     )
 
     # filter too many tags
-    ds = ds.filter(lambda x: len(x["general"]) <= 100, batched=False, num_proc=NUM_PROC)
+    ds = ds.filter(lambda x: len(x["general"]) <= 128, batched=False, num_proc=NUM_PROC)
     ds = ds.filter(
         lambda x: len(x["character"]) <= 10, batched=False, num_proc=NUM_PROC
     )
@@ -188,26 +196,36 @@ def main():
 
     # format tags
     ds = ds.map(
-        lambda x: map_format_tags(x, tag_composer),
+        map_format_tags,
         batched=True,
+        num_proc=NUM_PROC,
+        fn_kwargs={"composer": tag_composer},
+        remove_columns=ds.column_names,
+    )
+
+    # filter None
+    ds = ds.filter(
+        lambda x: x["text"] is not None,
+        batched=False,
         num_proc=NUM_PROC,
     )
 
     # tokenize
     ds = ds.map(
-        lambda x: map_tokenize_text(x, tokenizer),
+        map_tokenize_text,
         batched=True,
-        remove_columns=ds.column_names,
         num_proc=NUM_PROC,
+        fn_kwargs={"tokenizer": tokenizer},
     )
 
     # train test split
     ds = ds.train_test_split(
         test_size=10000 if not DEBUG else 10,
+        shuffle=True,
     )
 
     ds.push_to_hub(
-        "p1atdev/dart-v2-20240424-pretrain",
+        PUSH_ID,
         max_shard_size="4096MB",
         private=True,
     )

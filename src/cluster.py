@@ -29,6 +29,7 @@ class TagCluster:
         max_iter: int = 1000,
         trust_remote_code: bool = True,
         algorithm: CLUSTRING_ALGORITHM = "sklearn",
+        tag_list: list[str] | None = None,
     ):
         """Train a cluster map from an embedding model."""
 
@@ -39,6 +40,22 @@ class TagCluster:
         embeddings: np.ndarray = (
             model.get_input_embeddings().weight.detach().cpu().numpy()
         )
+        vocab = tokenizer.get_vocab()
+        if tag_list is not None:
+            print(f"tag_list: {len(tag_list)}")
+            tag_id_list = set()
+            for tag in tag_list:
+                index = tokenizer.convert_tokens_to_ids(tag)
+                if index is None:
+                    continue
+                tag_id_list.add(index)
+            print(f"original embeddings: {embeddings.shape}")
+            embeddings = embeddings[list(tag_id_list)]
+            print(f"filtered embeddings: {embeddings.shape}")
+            vocab = {
+                tokenizer.convert_ids_to_tokens(tag_id): i
+                for i, tag_id in enumerate(tag_id_list)
+            }
 
         if algorithm == "sklearn":
             kmeans = SklearnKMeans(
@@ -60,8 +77,7 @@ class TagCluster:
             raise ValueError(f"Invalid algorithm: {algorithm}")
 
         cluster_map = {
-            label: int(labels[token_id])
-            for label, token_id in tokenizer.get_vocab().items()
+            label: int(labels[token_id]) for label, token_id in vocab.items()
         }
 
         return cls(cluster_map)

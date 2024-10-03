@@ -17,7 +17,6 @@ decensored
 disc menu
 doujinshi
 end card
-extraction
 eyecatch
 figure-referenced
 game cg
@@ -30,7 +29,6 @@ incredibly absurdres
 key visual
 kisekae
 live2d
-lowres
 making-of
 mixed media
 novel illustration

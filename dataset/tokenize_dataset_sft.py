@@ -11,9 +11,7 @@ import numpy as np
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
-from src.group import TagGroup
 from src.cluster import TagCluster
-from src.organizer import GroupTagOrganizer, ClusterTagOrganizer
 from src.composer import TagComposer
 from src.tags import IDENTITY_LEVEL_NONE, IDENTITY_LEVEL_LAX, IDENTITY_LEVEL_STRICT
 from src.formatter import format_sft

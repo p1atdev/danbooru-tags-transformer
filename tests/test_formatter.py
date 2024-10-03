@@ -2,51 +2,27 @@ import sys
 
 sys.path.append(".")
 
-from src.composer import PrompotComponents
-from src.formatter import format_pretrain, format_sft
+from src.formatter import format_completion
+from src.tags import LengthTokens, AspectRatioTokens, RatingTokens
 
 
 def test_format_pretrain():
-    components = PrompotComponents(
+    prompt = format_completion(
+        priority="1girl, solo, simple background",
+        general="my general tag",
         copyright="my copyright tag",
         character="my original character",
-        rating="<|rating:general|>",
-        aspect_ratio="<|aspect_ratio:tall|>",
-        length="<|length:very_short|>",
-        general_condition="this field should not be included",
-        general_completion="1girl, animal ears, blue hair, cat ears",
+        rating=RatingTokens.RATING_GENERAL,
+        aspect_ratio=AspectRatioTokens.ASPECT_RATIO_TALL,
+        length=LengthTokens.LENGTH_MEDIUM,
+        meta="my meta tag",
     )
-
-    prompt = format_pretrain(components)
 
     assert prompt == (
         "<|bos|>"
         "<copyright>my copyright tag</copyright>"
         "<character>my original character</character>"
-        "<|rating:general|><|aspect_ratio:tall|><|length:very_short|>"
-        "<general>1girl, animal ears, blue hair, cat ears</general>"
-        "<|eos|>"
-    )
-
-
-def test_format_sft():
-    components = PrompotComponents(
-        copyright="vocaloid",
-        character="hatsune miku",
-        rating="<|rating:general|>",
-        aspect_ratio="<|aspect_ratio:wide|>",
-        length="<|length:very_short|>",
-        general_condition="solo, 1girl",
-        general_completion="blue hair, long hair, looking at viewer, twintails",
-    )
-
-    prompt = format_sft(components, "<|identity_level:lax|>")
-
-    assert prompt == (
-        "<|bos|>"
-        "<copyright>vocaloid</copyright>"
-        "<character>hatsune miku</character>"
-        "<|rating:general|><|aspect_ratio:wide|><|length:very_short|>"
-        "<general>solo, 1girl<|identity_level:lax|><|input_end|>blue hair, long hair, looking at viewer, twintails</general>"
+        "<|rating:general|><|aspect_ratio:tall|><|length:medium|>"
+        "<general>1girl, solo, simple background, my meta tag, my general tag</general>"
         "<|eos|>"
     )

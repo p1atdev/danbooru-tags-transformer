@@ -16,8 +16,8 @@ NUM_PROC = 40
 
 SEED = 12345
 
-DO_SHUFFLE = False
-PUSH_REPO_ID = "p1atdev/202408-at20240906-tokenized-unshuffle-1"
+DO_SHUFFLE = True
+PUSH_REPO_ID = "p1atdev/202408-at20240906-tokenized-shuffle-1"
 
 
 def prepare_dataset():
