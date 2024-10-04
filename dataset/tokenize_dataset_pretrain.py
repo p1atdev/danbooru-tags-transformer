@@ -17,7 +17,7 @@ TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/cluster_map_1024c2.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241003-pretrain"
+PUSH_ID = "p1atdev/dart-v3-20241004-pretrain"
 
 TEMPERATURE = 1.0
 CONDITION_RATE = 0.0
@@ -70,6 +70,10 @@ def map_split_tags(examples: Dataset, tokenizer: PreTrainedTokenizer):
             meta_tags = []
         else:
             meta_tags = [tag.strip() for tag in meta.split(", ") if tag.strip() != ""]
+
+        assert isinstance(character_tags, list)
+        assert isinstance(copyright_tags, list)
+        assert isinstance(meta_tags, list)
 
         character_list.append(character_tags)
         copyright_list.append(copyright_tags)
@@ -142,7 +146,7 @@ def main():
 
     if DEBUG:
         # debug
-        ds = ds.select(range(1000))
+        ds = ds.select(range(10900))
 
     # filter out empty text
     ds = ds.filter(

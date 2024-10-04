@@ -180,6 +180,47 @@ def test_tag_selector():
     ]
 
 
+def test_tag_meta_remove():
+    predefined_meta_tags: list[PredefinedTags] = [
+        PredefinedTags.ban_meta(),
+        PredefinedTags.displeasing_meta(),
+        PredefinedTags.usable_meta(),
+        PredefinedTags.medium(),
+    ]
+
+    meta_tags = [
+        "watercolor (medium)",
+        "character request",
+        "highres",
+        "duplicate",
+    ]
+
+    banned = []
+    removed = []
+    inserted = []
+
+    for predefined in predefined_meta_tags:
+        for tag_part in predefined.tags:
+            for tag in meta_tags:  # 部分的にでも含まれていたら
+                if tag_part in tag:
+                    if predefined.tag_type == PredefinedTagType.BAN:
+                        # BAN row
+                        banned.append(tag)
+                    elif predefined.tag_type == PredefinedTagType.REMOVE:
+                        # just remove
+                        removed.append(tag)
+                    elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                        # do nothing
+                        inserted.append(tag)
+
+    assert banned == ["duplicate"]
+    assert removed == ["character request"]
+    assert inserted == [
+        "highres",
+        "watercolor (medium)",
+    ]
+
+
 def test_prompt_compose_pretrain():
     cluster = TagCluster.from_pretrained("data/cluster_map_1024c1.json")
     frequency = TagFrequency.from_json("data/tag_frequency.json")
@@ -193,7 +234,7 @@ def test_prompt_compose_pretrain():
         general="full body, sitting, solo, watermark, 1girl",
         copyright="vocaloid",
         character="hatsune miku",
-        meta="watercolor (medium)",
+        meta="watercolor (medium), character request, highres",
         rating="g",
         image_width=832,
         image_height=1152,
@@ -203,9 +244,40 @@ def test_prompt_compose_pretrain():
 
     assert prompt == (
         "<|bos|>"
+        "<|rating:general|><|aspect_ratio:tall|><|length:very_short|>"
         "<copyright>vocaloid</copyright>"
         "<character>hatsune miku</character>"
+        "<general>1girl, solo, watercolor (medium), highres, sitting, full body</general>"
+        "<|eos|>"
+    )
+
+
+def test_prompt_compose_pretrain_list():
+    cluster = TagCluster.from_pretrained("data/cluster_map_1024c1.json")
+    frequency = TagFrequency.from_json("data/tag_frequency.json")
+
+    composer = TagComposer(
+        cluster,
+        frequency,
+    )
+
+    prompt = composer.compose_pretrain_list(
+        general_tags=["full body", "sitting", "solo", "watermark", "1girl"],
+        copyright_tags=["vocaloid"],
+        character_tags=["hatsune miku"],
+        meta_tags=["watercolor (medium)", "character request", "highres"],
+        rating="g",
+        image_width=832,
+        image_height=1152,
+        temperature=1.0,
+        condition_rate=0.0,
+    )
+
+    assert prompt == (
+        "<|bos|>"
         "<|rating:general|><|aspect_ratio:tall|><|length:very_short|>"
-        "<general>1girl, solo, watercolor (medium), sitting, full body</general>"
+        "<copyright>vocaloid</copyright>"
+        "<character>hatsune miku</character>"
+        "<general>1girl, solo, watercolor (medium), highres, sitting, full body</general>"
         "<|eos|>"
     )

@@ -78,6 +78,10 @@ class PredefinedTags:
         return cls.from_txt_file("tags/usable_meta.txt", PredefinedTagType.INSERT_START)
 
     @classmethod
+    def medium(cls) -> "PredefinedTags":
+        return cls.from_txt_file("tags/medium.txt", PredefinedTagType.INSERT_START)
+
+    @classmethod
     def watermark(cls) -> "PredefinedTags":
         return cls.from_txt_file("tags/watermark.txt", PredefinedTagType.REMOVE)
 
@@ -310,12 +314,14 @@ class TagComposer:
         PredefinedTags.ban_meta(),
         PredefinedTags.displeasing_meta(),
         PredefinedTags.usable_meta(),
+        PredefinedTags.medium(),
     ]
     predefined_general_tags: list[PredefinedTags] = [
         PredefinedTags.artistic_error(),
         PredefinedTags.watermark(),
         PredefinedTags.people(),
         PredefinedTags.focus(),
+        PredefinedTags.color_theme(),
         PredefinedTags.background(),
     ]
 
@@ -370,21 +376,22 @@ class TagComposer:
             elif predefined.tag_type == PredefinedTagType.INSERT_START:
                 top_insert_tags.extend(self.selector.sort_tags_by_frequency(tags))
 
-        meta_tags = [] if meta is None else meta.split(", ")
+        raw_meta_tags = [] if meta is None else meta.split(", ")
+        ok_meta_tags = []
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
-                for tag in meta_tags:  # 部分的にでも含まれていたら
+                for tag in raw_meta_tags:  # 部分的にでも含まれていたら
                     if tag_part in tag:
                         if predefined.tag_type == PredefinedTagType.BAN:
                             # BAN row
                             return None
                         elif predefined.tag_type == PredefinedTagType.REMOVE:
                             # just remove
-                            meta_tags.remove(tag)
+                            continue
                         elif predefined.tag_type == PredefinedTagType.INSERT_START:
                             # do nothing
-                            continue
-        meta_tags = self.selector.sort_tags_by_frequency(meta_tags)
+                            ok_meta_tags.append(tag)
+        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 出現頻度順にソート
         character_tags = [] if character is None else character.split(", ")
@@ -455,6 +462,7 @@ class TagComposer:
                 top_insert_tags.extend(self.selector.sort_tags_by_frequency(tags))
 
         assert isinstance(meta_tags, list)
+        ok_meta_tags = []
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
                 for tag in meta_tags:  # 部分的にでも含まれていたら
@@ -464,11 +472,12 @@ class TagComposer:
                             return None
                         elif predefined.tag_type == PredefinedTagType.REMOVE:
                             # just remove
-                            meta_tags.remove(tag)
+                            # meta_tags.remove(tag)
+                            continue
                         elif predefined.tag_type == PredefinedTagType.INSERT_START:
                             # do nothing
-                            continue
-        meta_tags = self.selector.sort_tags_by_frequency(meta_tags)
+                            ok_meta_tags.append(tag)
+        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 出現頻度順にソート
         character_tags = self.selector.sort_tags_by_frequency(character_tags)

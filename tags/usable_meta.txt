@@ -1,4 +1,4 @@
-absurdres
+
 adoptable
 album cover redraw
 anime screenshot
@@ -24,7 +24,7 @@ game model
 game screenshot
 gamma correction
 headshop
-highres
+
 incredibly absurdres
 key visual
 kisekae
