@@ -176,3 +176,4 @@ data/*
 # models
 dart2vec_*
 dart2vec-*
+output

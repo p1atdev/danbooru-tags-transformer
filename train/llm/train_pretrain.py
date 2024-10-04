@@ -13,22 +13,24 @@ from transformers import (
 )
 from accelerate import Accelerator
 
-from preset import get_model_config
+from config_util import get_model_config
 
-# import wandb
+import wandb
 
-SEED = 20240425
+SEED = 20241004
 
-EMBEDDING_MODEL = "p1atdev/dart-v2-vectors"
+# word embedding base
+EMBEDDING_MODEL = "p1atdev/dart-v3-vectors-opt_7-shuffled"
 
-TOKENIZER_NAME = "p1atdev/dart-v2-tokenizer"
-DATASET_NAME = "p1atdev/dart-v2-20240424-pretrain"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
+DATASET_NAME = "p1atdev/dart-v3-20241005-pretrain"
+
 MODEL_TYPE = "llama"
-MODEL_SIZE = "100m"
+MODEL_SIZE = "8layers"
 
-PROJECT_NAME = "danbooru-tags-transformer-v2"
-PUSH_HUB_NAME = "p1atdev/dart-v2-100m-llama"
-SAVE_DIR = "./dart-100m-llama"
+PROJECT_NAME = "danbooru-tags-transformer-v3"
+PUSH_HUB_NAME = "p1atdev/dart-v3-llama-8L-241005"
+SAVE_DIR = "./output/dart-llama-8L-241005"
 
 
 def prepare_models():
@@ -92,20 +94,21 @@ def main():
     accelerator = Accelerator()
     model.to(accelerator.device)
 
-    # wandb.init(project=PROJECT_NAME)
+    wandb.init(project=PROJECT_NAME)
     train_args = TrainingArguments(
         output_dir=SAVE_DIR,
         overwrite_output_dir=True,
         num_train_epochs=5,
         # auto_find_batch_size=True,
-        per_device_train_batch_size=128,
+        per_device_train_batch_size=64,
         per_device_eval_batch_size=32,
         gradient_accumulation_steps=2,
         learning_rate=5e-4,
-        warmup_steps=1000,
-        weight_decay=0.0,
-        optim="adamw_torch_fused",
-        lr_scheduler_type="cosine",
+        warmup_steps=2500,
+        weight_decay=0.01,
+        optim="ademamix",
+        lr_scheduler_type="cosine_with_restarts",
+        lr_scheduler_kwargs={"num_cycles": 2},
         evaluation_strategy="steps",
         eval_steps=1000,
         save_steps=1000,
@@ -117,7 +120,7 @@ def main():
         dataloader_num_workers=accelerator.num_processes,
         torch_compile=True,
         bf16=True,
-        report_to=[],
+        report_to=["wandb"],
         hub_model_id=PUSH_HUB_NAME,
         hub_private_repo=True,
         push_to_hub=True,
