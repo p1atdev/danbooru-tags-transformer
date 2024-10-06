@@ -16,13 +16,13 @@ import wandb
 
 SEED = 20240913
 
-TOKENIZER_NAME = "p1atdev/dart-tokenizer-v3-240910"
-DATASET_NAME = "p1atdev/202403-at20240423-tokenized-shuffle"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
+DATASET_NAME = "p1atdev/202408-at20240906-tokenized-shuffle-1"
 CONFIG_PATH = "./config/opt/125m.json"
 
 PROJECT_NAME = "dart-v3-vectors"
-PUSH_HUB_NAME = "p1atdev/dart-v3-vectors-opt_1"
-SAVE_DIR = "./vec_opt_1"
+PUSH_HUB_NAME = "p1atdev/dart-v3-vectors-opt_7-shuffled"
+SAVE_DIR = "./output/vec_opt_7"
 
 
 def prepare_models():
@@ -50,6 +50,8 @@ def prepare_models():
 def prepare_dataset():
     ds = load_dataset(DATASET_NAME)
 
+    ds = ds.shuffle(seed=SEED)
+
     return ds
 
 
@@ -72,23 +74,24 @@ def main():
     train_args = TrainingArguments(
         output_dir=SAVE_DIR,
         overwrite_output_dir=True,
-        num_train_epochs=10,
+        num_train_epochs=5,
         # auto_find_batch_size=True,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
         gradient_accumulation_steps=4,
-        learning_rate=8e-4,
-        warmup_steps=100,
-        weight_decay=0.0,
+        learning_rate=5e-4,
+        warmup_ratio=0.01,  # 1% of total steps
+        weight_decay=0.1,
         optim="adamw_torch_fused",
-        lr_scheduler_type="reduce_lr_on_plateau",
+        lr_scheduler_type="cosine_with_min_lr",
         lr_scheduler_kwargs={
-            "patience": 1,
-            "threshold": 1e-4,
+            "min_lr": 1e-5,
+            "num_cycles": 0.5,
+            # "num_warmup_steps": 1000,
         },
         evaluation_strategy="steps",
-        eval_steps=1000,
-        save_steps=1000,
+        eval_steps=200,
+        save_steps=200,
         save_total_limit=2,
         logging_steps=1,
         logging_first_step=True,
