@@ -14,23 +14,26 @@ from transformers import (
     set_seed,
 )
 from accelerate import Accelerator
-from trl import DataCollatorForCompletionOnlyLM, SFTTrainer
+from trl import DataCollatorForCompletionOnlyLM
 
-from src.tags import INPUT_END
+from src.tags import InstructionTokens
 
-# import wandb
+import wandb
 
-SEED = 20240428
+SEED = 20241006
 
-BASE_MODEL_NAME = "p1atdev/dart-v2-llama-100m"
+# pretrained model
+BASE_MODEL_NAME = "p1atdev/dart-v3-llama-8L-241005"
 
-DATASET_NAME = "p1atdev/dart-v2-20240428-sft"
+DATASET_NAME = "p1atdev/dart-v3-20241006-sft"
 
-PROJECT_NAME = "danbooru-tags-transformer-v2"
-PUSH_HUB_NAME = "p1atdev/dart-v2-llama-100m-sft"
-SAVE_DIR = "./dart-100m-llama-sft"
+PROJECT_NAME = "danbooru-tags-transformer-v3"
+PUSH_HUB_NAME = "p1atdev/dart-v3-llama-8L-241005_241006-sft"
+SAVE_DIR = "./output/dart-llama-8L-241005_241006-sft"
 
 NUM_PROC = 4
+
+INPUT_END = InstructionTokens.INPUT_END  # for sft
 
 
 def prepare_models():
@@ -67,20 +70,21 @@ def main():
     accelerator = Accelerator()
     model.to(accelerator.device)
 
-    # wandb.init(project=PROJECT_NAME)
+    wandb.init(project=PROJECT_NAME)
     train_args = TrainingArguments(
         output_dir=SAVE_DIR,
         overwrite_output_dir=True,
         num_train_epochs=4,
         # auto_find_batch_size=True,
-        per_device_train_batch_size=128,
+        per_device_train_batch_size=64,
         per_device_eval_batch_size=32,
         gradient_accumulation_steps=2,
         learning_rate=1e-4,
         warmup_steps=1000,
-        weight_decay=0.0,
-        optim="adamw_torch_fused",
-        lr_scheduler_type="cosine",
+        weight_decay=0.01,
+        optim="ademamix",
+        lr_scheduler_type="cosine_with_restarts",
+        lr_scheduler_kwargs={"num_cycles": 1},
         evaluation_strategy="steps",
         eval_steps=1000,
         save_steps=1000,
@@ -90,10 +94,10 @@ def main():
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         dataloader_num_workers=accelerator.num_processes,
-        # neftune_noise_alpha=5,  # added
+        neftune_noise_alpha=5,
         torch_compile=True,
         bf16=True,
-        report_to=[],
+        report_to=["wandb"],
         hub_model_id=PUSH_HUB_NAME,
         hub_private_repo=True,
         push_to_hub=True,
