@@ -5,6 +5,7 @@ torchaudio
 
 accelerate
 transformers
+trl
 datasets
 hf-transfer
 bitsandbytes
