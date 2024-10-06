@@ -67,10 +67,9 @@ TAG_INITIAL_CONDITION_TEMPLATE = (
     f"{CHARACTER_END}"
     #
     f"{GENERAL_START}"
-    "{condition_meta}"
-    "{condition_general}"
+    "{condition}"
     f"{INPUT_END}"  #! instruction end
-    "{priority}, {meta}, {general}"
+    "{meta_general}"
     f"{GENERAL_END}"
     #
     f"{EOS}"
@@ -170,4 +169,20 @@ def format_completion(
         rating=rating,
         aspect_ratio=aspect_ratio,
         length=length,
+    )
+
+
+def format_sft_with_initial_condition(
+    condition: list[str],
+    copyright: list[str],
+    character: list[str],
+    meta_general: list[str],
+    rating_aspect_ratio_length: list[str],
+):
+    return TAG_INITIAL_CONDITION_TEMPLATE.format(
+        rating_aspect_ratio_length="".join(rating_aspect_ratio_length),
+        condition=", ".join(condition),
+        copyright=", ".join(copyright),
+        character=", ".join(character),
+        meta_general=", ".join(meta_general),
     )

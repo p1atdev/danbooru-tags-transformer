@@ -2,117 +2,85 @@ import sys
 
 sys.path.append(".")
 
-import os
-
-os.environ["OPENBLAS_NUM_THREADS"] = "1"  # to prevent OpenBLAS's error
-
+import random
 import numpy as np
 
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
-from src.cluster import TagCluster
-from src.composer import TagComposer
-from src.tags import IDENTITY_LEVEL_NONE, IDENTITY_LEVEL_LAX, IDENTITY_LEVEL_STRICT
-from src.formatter import format_sft
-
-from tokenize_dataset_pretrain import map_tokenize_text, map_split_tags
+from src.composer import TagComposer, TagCluster, TagFrequency
 
 MAX_LENGTH = 256
 
-PUSH_HUB_NAME = "p1atdev/dart-v2-20240502-sft"
-SCORE_BOUNDARY = {
-    "g": 1,  # about bottom 20%
-    "s": 1,
-    "q": 4,
-    "e": 5,
-}
-
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
-REVISION = "202403-at20240422"
+REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-v2-tokenizer"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
+FREQUENCY_PATH = "data/tag_frequency.json"
+CLUSTER_PATH = "data/cluster_map_1024c2.json"
 
-FUZZY_RATING_RATE = 0.3
-DROP_PEOPLE_RATE = 0.1
-CONDITION_RATES = {
-    0.75: 0.25,  # 25%の確率で0~75%のクラスターを条件にする
-    0.5: 0.25,  # 25%の確率で0~50%のクラスターを条件にする
-    0.25: 0.5,  # 50%の確率で0~25%のクラスターを条件にする
-}
-COPYRIGHT_CHARACTER_AUGMENTATION_RATE = 1.25
-IDENTITY_LEVEL_RATES = {
-    # "none": 0.0, # ランダムな分割は行わない
-    "lax": 0.6,
-    "strict": 0.4,
-}
+PUSH_ID = "p1atdev/dart-v3-20241006-sft"
 
-NUM_PROC = 1
+YEAR_MIN = 2018
+
+NUM_PROC = 40
 
 SEED = 12345
 
-DEBUG = True
+DEBUG = False
 
 
-def prepare_group():
-    group = TagGroup()
-
-    return group
-
-
-def prepare_cluster(
-    embedding_model_name: str,
-    num_clusters: int,
-    num_init: int,
-    max_iter: int,
-    save_path: str,
+# べき乗を使ったランダムな値を生成する関数
+def power_distribution_random(
+    n: float = 1.25,
+    size: int = 1,
 ):
-    if os.path.exists(save_path):
-        print("Loading cluster...")
-        cluster = TagCluster.from_pretrained(save_path)
-        print("Cluster loaded.")
-    else:
-        print("Training cluster...")
-        cluster = TagCluster.train_from_embedding_model(
-            embedding_model_name=embedding_model_name,
-            n_clusters=num_clusters,
-            n_init=num_init,
-            max_iter=max_iter,
-        )
-        cluster.save_pretrained(save_path)
-        print("Cluster trained and saved.")
+    """
+    0から1の範囲でべき乗に基づいたランダムな値を生成する関数。
 
-    return cluster
+    Parameters:
+    - n: べき乗の指数 (n > 1 なら 0 寄り、n < 1 なら 1 寄り)
+    - size: 生成する乱数の個数
+
+    Returns:
+    - np.array: ランダムな値のリスト
+    """
+    return np.array([random.random() ** n for _ in range(size)])
 
 
-DEFAULT_TAG_GROUP = prepare_group()
-EMBEDDING_CLUSTERS = {
-    "lax": prepare_cluster(
-        embedding_model_name="p1atdev/dart-v2-vectors",
-        num_clusters=512,
-        num_init=20,
-        max_iter=500,
-        save_path="data/cluster_map_512c.json",
-    ),
-    "strict": prepare_cluster(
-        embedding_model_name="p1atdev/dart-v2-vectors",
-        num_clusters=256,  # fewer than lax
-        num_init=20,
-        max_iter=500,
-        save_path="data/cluster_map_256c.json",
-    ),
-}
-TAG_ORGANIZERS = {
-    # "none": GroupTagOrganizer(DEFAULT_TAG_GROUP),
-    "lax": ClusterTagOrganizer(DEFAULT_TAG_GROUP, EMBEDDING_CLUSTERS["lax"]),
-    "strict": ClusterTagOrganizer(DEFAULT_TAG_GROUP, EMBEDDING_CLUSTERS["strict"]),
-}
-IDENTITY_LEVEL_TAGS = {
-    # "none": IDENTITY_LEVEL_NONE,
-    "lax": IDENTITY_LEVEL_LAX,
-    "strict": IDENTITY_LEVEL_STRICT,
-}
+# ガウス分布（正規分布）を使ったランダムな値を生成する関数
+def gaussian_distribution_random(
+    mean: float = 1.0,
+    std_dev: float = 0.1,
+    size: int = 1,
+    min_value: float = 0.0,
+    max_value: float = 2.0,
+):
+    """
+    ガウス分布（正規分布）に基づいたランダムな値を生成し、0から2の範囲にクリップする関数。
+
+    Parameters:
+    - mean: 平均
+    - std_dev: 標準偏差
+    - size: 生成する乱数の個数
+
+    Returns:
+    - np.array: ランダムな値のリスト
+    """
+    return np.clip(np.random.normal(mean, std_dev, size), min_value, max_value)
+
+
+# 条件とする確率を生成 (0.0 から 1.0 の範囲で0寄り多め)
+def get_condition_rate(batch_size: int = 1) -> list[float]:
+    rand = power_distribution_random(size=batch_size)
+    return rand.tolist()
+
+
+# temperature を生成 (0~2で1寄り)
+def get_temperature(batch_size: int = 1) -> list[float]:
+    rand = gaussian_distribution_random(size=batch_size)
+    return rand.tolist()
 
 
 def prepare_dataset():
@@ -128,89 +96,136 @@ def prepare_tokenizer():
     return tokenizer
 
 
-def filter_by_score(examples: Dataset, score_boundary: dict):
-    """Cut off worst 20%"""
+def filter_by_year(examples: Dataset):
     flags = []
-
-    for i, rating in enumerate(examples["rating"]):
-        score = examples["score"][i]
-        boundary = score_boundary[rating]
-
-        if score <= boundary:
-            flags.append(False)
-        else:
-            flags.append(True)
+    for date in examples["created_at"]:
+        year = int(date.split("-")[0])
+        flags.append(year >= YEAR_MIN)
 
     return flags
 
 
-def map_format_tags(examples: Dataset, composer: TagComposer):
-    text_list = []
-    flags = []
+def map_split_tags(examples: Dataset, tokenizer: PreTrainedTokenizer):
+    general_list = []
+    character_list = []
+    copyright_list = []
+    meta_list = []
 
     for i, id in enumerate(examples["id"]):
-        general = examples["general"][i]
-        character = examples["character"][i]
-        copyright = examples["copyright"][i]
-        rating = examples["rating"][i]
-        image_width = examples["image_width"][i]
-        image_height = examples["image_height"][i]
+        general: str = examples["general"][i]
+        character: str = examples["character"][i]
+        copyright: str = examples["copyright"][i]
+        meta: str = examples["meta"][i]
 
-        # 処理分岐でidentity_levelを変える
-        identity_level: str = np.random.choice(
-            list(IDENTITY_LEVEL_RATES.keys()), p=list(IDENTITY_LEVEL_RATES.values())
-        )
+        if character is None:
+            character_tags = []
+        else:
+            character_tags = [
+                tag.strip() for tag in character.split(", ") if tag.strip() != ""
+            ]
+        if copyright is None:
+            copyright_tags = []
+        else:
+            copyright_tags = [
+                tag.strip() for tag in copyright.split(", ") if tag.strip() != ""
+            ]
+        if meta is None:
+            meta_tags = []
+        else:
+            meta_tags = [tag.strip() for tag in meta.split(", ") if tag.strip() != ""]
 
-        # parse and organize tags
-        result = TAG_ORGANIZERS[identity_level].organize_tags(general)
-        try:
-            components = composer.get_components_identity_keep(
-                rating=rating,
-                copyright=copyright,
-                character=character,
-                organizer_result=result,
-                image_width=image_width,
-                image_height=image_height,
-            )
+        assert isinstance(character_tags, list)
+        assert isinstance(copyright_tags, list)
+        assert isinstance(meta_tags, list)
 
-            # format a prompt
-            prompt = format_sft(components, IDENTITY_LEVEL_TAGS[identity_level])
+        character_list.append(character_tags)
+        copyright_list.append(copyright_tags)
+        meta_list.append(meta_tags)
 
-            text_list.append(prompt)
-            flags.append(True)
-        except Exception as e:
-            print(f"Failed to format tags: {e}")
-            text_list.append("")
-            flags.append(False)
+        # encode general tags and remove unk tokens, then decode
+        general_token_ids = tokenizer.encode_plus(
+            general, add_special_tokens=False
+        ).input_ids
+        general_token_ids = [
+            token_id
+            for token_id in general_token_ids
+            if token_id != tokenizer.unk_token_id
+        ]
+        general_tags = tokenizer.batch_decode(general_token_ids)
+        general_list.append(general_tags)
 
     return {
+        "general": general_list,
+        "character": character_list,
+        "copyright": copyright_list,
+        "meta": meta_list,
+    }
+
+
+def map_format_tags(examples: Dataset, composer: TagComposer):
+    text_list = []
+
+    batch_size = len(examples["id"])
+    # ランダムに確率を変動させる
+    condition_rates = get_condition_rate(batch_size)
+    temperatures = get_temperature(batch_size)
+
+    for i, (condition_rate, temperature) in enumerate(
+        zip(condition_rates, temperatures, strict=True)
+    ):
+        prompt = composer.compose_sft_list(
+            general_tags=examples["general"][i],
+            copyright_tags=examples["copyright"][i],
+            character_tags=examples["character"][i],
+            meta_tags=examples["meta"][i],
+            rating=examples["rating"][i],
+            image_width=examples["image_width"][i],
+            image_height=examples["image_height"][i],
+            temperature=temperature,
+            condition_rate=condition_rate,
+        )
+        text_list.append(prompt)
+
+    return {
+        "id": examples["id"],
         "text": text_list,
-        "is_ok": flags,
+    }
+
+
+def map_tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
+    tokenized = tokenizer(example["text"])
+    input_ids = tokenized["input_ids"]
+
+    return {
+        "input_ids": input_ids,
     }
 
 
 def main():
     set_seed(SEED)
 
+    cluster = TagCluster.from_pretrained(CLUSTER_PATH)
+    freq = TagFrequency.from_json(FREQUENCY_PATH)
+
     tag_composer = TagComposer(
-        fuzzy_rating_tag_rate=FUZZY_RATING_RATE,
-        drop_people_rate=DROP_PEOPLE_RATE,
-        condition_rates=CONDITION_RATES,
-        copyright_character_augmentation_rate=COPYRIGHT_CHARACTER_AUGMENTATION_RATE,
+        cluster=cluster,
+        frequency=freq,
     )
 
     ds = prepare_dataset()
     tokenizer = prepare_tokenizer()
 
-    if DEBUG:
-        ds = ds.select(range(1000))
-
-    # filter by score
+    # filter by year
     ds = ds.filter(
-        lambda x: filter_by_score(x, SCORE_BOUNDARY),
+        filter_by_year,
         batched=True,
+        batch_size=1024,
         num_proc=NUM_PROC,
     )
+
+    if DEBUG:
+        # debug
+        ds = ds.select(range(10000))
 
     # filter out empty text
     ds = ds.filter(
@@ -249,13 +264,14 @@ def main():
 
     # split tags
     ds = ds.map(
-        lambda x: map_split_tags(x, tokenizer),
+        map_split_tags,
         batched=True,
         num_proc=NUM_PROC,
+        fn_kwargs={"tokenizer": tokenizer},
     )
 
     # filter too many tags
-    ds = ds.filter(lambda x: len(x["general"]) <= 100, batched=False, num_proc=NUM_PROC)
+    ds = ds.filter(lambda x: len(x["general"]) <= 128, batched=False, num_proc=NUM_PROC)
     ds = ds.filter(
         lambda x: len(x["character"]) <= 10, batched=False, num_proc=NUM_PROC
     )
@@ -263,28 +279,36 @@ def main():
 
     # format tags
     ds = ds.map(
-        lambda x: map_format_tags(x, tag_composer),
+        map_format_tags,
         batched=True,
+        num_proc=NUM_PROC,
+        fn_kwargs={"composer": tag_composer},
+        remove_columns=ds.column_names,
+    )
+
+    # filter None
+    ds = ds.filter(
+        lambda x: x["text"] is not None,
+        batched=False,
         num_proc=NUM_PROC,
     )
 
-    # remove failed
-    ds = ds.filter(lambda x: x["is_ok"], batched=False, num_proc=NUM_PROC)
-
     # tokenize
     ds = ds.map(
-        lambda x: map_tokenize_text(x, tokenizer),
+        map_tokenize_text,
         batched=True,
         num_proc=NUM_PROC,
+        fn_kwargs={"tokenizer": tokenizer},
     )
 
     # train test split
     ds = ds.train_test_split(
         test_size=10000 if not DEBUG else 10,
+        shuffle=True,
     )
 
     ds.push_to_hub(
-        PUSH_HUB_NAME,
+        PUSH_ID,
         max_shard_size="4096MB",
         private=True,
     )

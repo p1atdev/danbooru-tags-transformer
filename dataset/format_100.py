@@ -21,11 +21,11 @@ def map_format(examples, composer: TagComposer):
     prompts = []
 
     for i, id in enumerate(examples["id"]):
-        prompt = composer.compose_pretrain(
-            general=examples["general"][i],
-            copyright=examples["copyright"][i],
-            character=examples["character"][i],
-            meta=examples["meta"][i],
+        prompt = composer.compose_pretrain_list(
+            general_tags=examples["general"][i].split(", "),
+            copyright_tags=examples["copyright"][i].split(", "),
+            character_tags=examples["character"][i].split(", "),
+            meta_tags=examples["meta"][i].split(", "),
             rating=examples["rating"][i],
             image_width=examples["image_width"][i],
             image_height=examples["image_height"][i],

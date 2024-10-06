@@ -12,7 +12,21 @@ from .rating import get_rating_tag, get_ambitious_rating_tag, SHORT_RATING_TAG
 from .aspect_ratio import calculate_aspect_ratio_tag, is_extreme_aspect_ratio
 from .length import get_length_tag, is_too_long_tags
 from .cluster import TagCluster
-from .formatter import format_completion
+from .formatter import format_completion, format_sft_with_initial_condition
+
+
+def random_choose(tags: list[str], rate: float) -> tuple[list[str], list[str]]:
+    """
+    Tiven a list of tags, randomly choose tags.
+    """
+    chosen = []
+    remains = []
+    for tag in tags:
+        if random.random() < rate:
+            chosen.append(tag)
+        else:
+            remains.append(tag)
+    return chosen, remains
 
 
 class PredefinedTagType(Enum):
@@ -239,15 +253,19 @@ class TagSelector:
         for i, tag in enumerate(tags):
             freqs = avg_softmax(np.array(all_freqs[i:]), temperature)
             criteria = freqs[0] * condition_rate  # 先頭(現在)のタグの確率
-            if criteria > random.random():
+            rand = random.random()
+            if criteria < rand:
                 conditons = tags[: i + 1]
-            else:
                 # 条件に合わなかったら残りは全部othersに入れる
                 others = tags[i + 1 :]
                 break
+        if len(conditons) == 0 and len(others) == 0:  # 一度も条件が発生しなかった場合
+            others = tags
 
         # 抜けがないかチェック
-        assert len(conditons) + len(others) == len(tags)
+        assert len(conditons) + len(others) == len(
+            tags
+        ), f"{len(conditons)} + {len(others)} != {len(tags)}"
 
         return conditons, others
 
@@ -333,91 +351,6 @@ class TagComposer:
 
         self.selector = TagSelector(cluster, frequency, predefined_tags)
 
-    def compose_pretrain(
-        self,
-        general: str | None,
-        copyright: str | None,
-        character: str | None,
-        meta: str | None,
-        rating: SHORT_RATING_TAG,  # g, s, q, e
-        image_width: int,
-        image_height: int,
-        temperature: float = 1.0,
-        condition_rate: float = 0.0,
-    ) -> str | None:  # returns None if the prompt should be skipped
-        # タグを取得
-        if is_extreme_aspect_ratio(image_width, image_height):
-            return None
-        aspect_ratio_tag = calculate_aspect_ratio_tag(image_width, image_height)
-
-        general_tags = [] if general is None else general.split(", ")
-        if len(general_tags) == 0:
-            return None
-
-        # タグをソート
-        high_priorities, _conditions, low_priorities = (
-            self.selector.separate_and_sort_tags(
-                general_tags,
-                condition_rate=condition_rate,
-                temperature=temperature,
-            )
-        )
-        top_insert_tags = []
-        for tags, predefined in zip(
-            high_priorities, self.selector.high_priority_groups, strict=True
-        ):
-            if predefined.tag_type == PredefinedTagType.BAN:
-                if len(tags) > 0:
-                    # BAN row
-                    return None
-            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                # just remove
-                continue
-            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                top_insert_tags.extend(self.selector.sort_tags_by_frequency(tags))
-
-        raw_meta_tags = [] if meta is None else meta.split(", ")
-        ok_meta_tags = []
-        for predefined in self.predefined_meta_tags:
-            for tag_part in predefined.tags:
-                for tag in raw_meta_tags:  # 部分的にでも含まれていたら
-                    if tag_part in tag:
-                        if predefined.tag_type == PredefinedTagType.BAN:
-                            # BAN row
-                            return None
-                        elif predefined.tag_type == PredefinedTagType.REMOVE:
-                            # just remove
-                            continue
-                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                            # do nothing
-                            ok_meta_tags.append(tag)
-        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
-
-        # 出現頻度順にソート
-        character_tags = [] if character is None else character.split(", ")
-        copyright_tags = [] if copyright is None else copyright.split(", ")
-
-        character_tags = self.selector.sort_tags_by_frequency(character_tags)
-        copyright_tags = self.selector.sort_tags_by_frequency(copyright_tags)
-
-        # ほかのタグ
-        rating_tag = get_rating_tag(rating)
-        length_tag = get_length_tag(len(low_priorities))
-
-        # テンプレートに適用
-        prompt = format_completion(
-            priority=top_insert_tags,
-            general=low_priorities,
-            character=character_tags,
-            copyright=copyright_tags,
-            meta=meta_tags,
-            rating=rating_tag,
-            aspect_ratio=aspect_ratio_tag,
-            length=length_tag,
-        )
-
-        return prompt
-
     def compose_pretrain_list(
         self,
         general_tags: list[str],
@@ -434,6 +367,10 @@ class TagComposer:
         if is_extreme_aspect_ratio(image_width, image_height):
             return None
         aspect_ratio_tag = calculate_aspect_ratio_tag(image_width, image_height)
+
+        # ほかのタグ
+        rating_tag = get_rating_tag(rating)
+        length_tag = get_length_tag(len(general_tags))
 
         assert isinstance(general_tags, list)
         if len(general_tags) == 0:
@@ -483,10 +420,6 @@ class TagComposer:
         character_tags = self.selector.sort_tags_by_frequency(character_tags)
         copyright_tags = self.selector.sort_tags_by_frequency(copyright_tags)
 
-        # ほかのタグ
-        rating_tag = get_rating_tag(rating)
-        length_tag = get_length_tag(len(low_priorities))
-
         # テンプレートに適用
         prompt = format_completion(
             priority=top_insert_tags,
@@ -497,6 +430,105 @@ class TagComposer:
             rating=rating_tag,
             aspect_ratio=aspect_ratio_tag,
             length=length_tag,
+        )
+
+        return prompt
+
+    def compose_sft_list(
+        self,
+        general_tags: list[str],
+        copyright_tags: list[str],
+        character_tags: list[str],
+        meta_tags: list[str],
+        rating: SHORT_RATING_TAG,
+        image_width: int,
+        image_height: int,
+        temperature: float = 1.0,
+        condition_rate: float = 0.0,
+    ) -> str | None:  # returns None if the prompt should be skipped
+        # タグを取得
+        if is_extreme_aspect_ratio(image_width, image_height):
+            return None
+        aspect_ratio_tag = calculate_aspect_ratio_tag(image_width, image_height)
+
+        # ほかのタグ
+        rating_tag = get_rating_tag(rating)
+        length_tag = get_length_tag(len(general_tags))
+
+        assert isinstance(general_tags, list)
+        if len(general_tags) == 0:
+            return None
+
+        # タグをソート
+        high_priorities, conditions, low_priorities = (
+            self.selector.separate_and_sort_tags(
+                general_tags,
+                condition_rate=condition_rate,
+                temperature=temperature,
+            )
+        )
+        top_insert_tags = []
+        for tags, predefined in zip(
+            high_priorities, self.selector.high_priority_groups, strict=True
+        ):
+            if predefined.tag_type == PredefinedTagType.BAN:
+                if len(tags) > 0:
+                    # BAN row
+                    return None
+            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                # just remove
+                continue
+            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                top_insert_tags.extend(tags)
+
+        assert isinstance(meta_tags, list)
+        ok_meta_tags = []
+        for predefined in self.predefined_meta_tags:
+            for tag_part in predefined.tags:
+                for tag in meta_tags:  # 部分的にでも含まれていたら
+                    if tag_part in tag:
+                        if predefined.tag_type == PredefinedTagType.BAN:
+                            # BAN row
+                            return None
+                        elif predefined.tag_type == PredefinedTagType.REMOVE:
+                            # just remove
+                            # meta_tags.remove(tag)
+                            continue
+                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                            # do nothing
+                            ok_meta_tags.append(tag)
+        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
+
+        # 条件部分
+        meta_condition_tags, meta_remains_tags = random_choose(
+            meta_tags, condition_rate
+        )  # condition_rateの確率でmeta_tagsを含める
+        condition_tags = top_insert_tags + conditions + meta_condition_tags
+
+        # オリジナルなら original タグを確率でドロップ
+        if copyright_tags == ["original"] and character_tags == []:
+            if random.random() < 0.5:  # 50%の確率でドロップ
+                copyright_tags = []
+
+        # シャッフル
+        random.shuffle(condition_tags)
+        random.shuffle(character_tags)
+        random.shuffle(copyright_tags)
+
+        # まとめてシャッフル
+        rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
+        random.shuffle(rating_aspect_ratio_length)
+
+        # 生成部分
+        meta_general = meta_remains_tags + low_priorities
+
+        # テンプレートに適用
+        prompt = format_sft_with_initial_condition(
+            rating_aspect_ratio_length=rating_aspect_ratio_length,  # shuffled
+            condition=condition_tags,  # shuffled
+            copyright=copyright_tags,  # shuffled
+            character=character_tags,  # shuffled
+            meta_general=meta_general,
         )
 
         return prompt
