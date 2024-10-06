@@ -14,18 +14,32 @@ DS_NAME = "isek-ai/danbooru-tags-2024"
 REVISION = "202408-at20240906"
 
 TEMPERATURE = 1.0
-CONDITION_RATE = 0.0
+CONDITION_RATE = 0.5
 
 
 def map_format(examples, composer: TagComposer):
     prompts = []
 
     for i, id in enumerate(examples["id"]):
-        prompt = composer.compose_pretrain_list(
-            general_tags=examples["general"][i].split(", "),
-            copyright_tags=examples["copyright"][i].split(", "),
-            character_tags=examples["character"][i].split(", "),
-            meta_tags=examples["meta"][i].split(", "),
+        general = examples["general"][i]
+        character = examples["character"][i]
+        copyright = examples["copyright"][i]
+        meta = examples["meta"][i]
+
+        if general is None or general.strip() == "":
+            prompts.append(None)
+            continue
+
+        general = general.split(", ")
+        character = [] if character is None else character.split(", ")
+        copyright = [] if copyright is None else copyright.split(", ")
+        meta = [] if meta is None else meta.split(", ")
+
+        prompt = composer.compose_sft_list(
+            general_tags=general,
+            copyright_tags=copyright,
+            character_tags=character,
+            meta_tags=meta,
             rating=examples["rating"][i],
             image_width=examples["image_width"][i],
             image_height=examples["image_height"][i],
