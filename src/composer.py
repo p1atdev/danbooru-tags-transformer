@@ -461,6 +461,8 @@ class TagComposer:
         if len(general_tags) == 0:
             return None
 
+        is_full_dropout = full_dropout_rate > 0 and random.random() < full_dropout_rate
+
         # タグをソート
         high_priorities, conditions, low_priorities = (
             self.selector.separate_and_sort_tags(
@@ -469,7 +471,7 @@ class TagComposer:
                 temperature=temperature,
             )
         )
-        if full_dropout_rate > 0 and random.random() < full_dropout_rate:
+        if is_full_dropout:
             # 条件部分を低優先度に移動
             low_priorities.extend(conditions)
             conditions = []
@@ -508,15 +510,16 @@ class TagComposer:
         meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 条件部分
-        if full_dropout_rate > 0 and random.random() < full_dropout_rate:
+        if is_full_dropout:
             # 条件部分を全部補完側に移動
             meta_condition_tags: list[str] = []
             meta_remains_tags = meta_tags
+            condition_tags = []
         else:
             meta_condition_tags, meta_remains_tags = random_choose(
                 meta_tags, condition_rate
             )  # condition_rateの確率でmeta_tagsを含める
-        condition_tags = top_insert_tags + conditions + meta_condition_tags
+            condition_tags = top_insert_tags + conditions + meta_condition_tags
 
         # オリジナルなら original タグを確率でドロップ
         if copyright_tags == ["original"] and character_tags == []:
@@ -533,7 +536,10 @@ class TagComposer:
         random.shuffle(rating_aspect_ratio_length)
 
         # 生成部分
-        meta_general = meta_remains_tags + low_priorities
+        if is_full_dropout:
+            meta_general = top_insert_tags + meta_remains_tags + low_priorities
+        else:
+            meta_general = meta_remains_tags + low_priorities
 
         # テンプレートに適用
         prompt = format_sft_with_initial_condition(
