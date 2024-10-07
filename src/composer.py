@@ -254,11 +254,10 @@ class TagSelector:
             freqs = avg_softmax(np.array(all_freqs[i:]), temperature)
             criteria = freqs[0] * condition_rate  # 先頭(現在)のタグの確率
             rand = random.random()
-            if criteria < rand:
-                conditons = tags[: i + 1]
-                # 条件に合わなかったら残りは全部othersに入れる
-                others = tags[i + 1 :]
-                break
+            if criteria > rand:
+                conditons.append(tag)
+            else:
+                others.append(tag)
         if len(conditons) == 0 and len(others) == 0:  # 一度も条件が発生しなかった場合
             others = tags
 
@@ -291,7 +290,9 @@ class TagSelector:
         for i, group in enumerate(self.high_priority_groups):
             high_priorities.append([])
 
-            for tag in low_priorities:
+            for tag in (
+                low_priorities.copy()
+            ):  # must copy to remove elements later in the loop
                 if tag in group.tags:
                     high_priorities[i].append(tag)
                     low_priorities.remove(tag)
@@ -301,10 +302,10 @@ class TagSelector:
 
         # クラスターごとに分類
         cluster_tags = self.clustering_tags(low_priorities)
-        for cluster_id, tags in cluster_tags.items():
+        for cluster_id, in_cluster_tags in cluster_tags.items():
             # 条件に入れるタグと入れないタグを分類
             conditons, others = self.random_conditioning(
-                tags, condition_rate, temperature
+                in_cluster_tags, condition_rate, temperature
             )
             conditions.extend(conditons)
             remains.extend(others)
@@ -445,6 +446,7 @@ class TagComposer:
         image_height: int,
         temperature: float = 1.0,
         condition_rate: float = 0.0,
+        full_dropout_rate: float = 0.05,  # 5%の確率で全てのgeneralタグをドロップして条件に含めない
     ) -> str | None:  # returns None if the prompt should be skipped
         # タグを取得
         if is_extreme_aspect_ratio(image_width, image_height):
@@ -467,6 +469,12 @@ class TagComposer:
                 temperature=temperature,
             )
         )
+        if full_dropout_rate > 0 and random.random() < full_dropout_rate:
+            # 条件部分を低優先度に移動
+            low_priorities.extend(conditions)
+            conditions = []
+            low_priorities = self.selector.sort_tags_by_frequency(low_priorities)
+
         top_insert_tags = []
         for tags, predefined in zip(
             high_priorities, self.selector.high_priority_groups, strict=True
@@ -500,9 +508,14 @@ class TagComposer:
         meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 条件部分
-        meta_condition_tags, meta_remains_tags = random_choose(
-            meta_tags, condition_rate
-        )  # condition_rateの確率でmeta_tagsを含める
+        if full_dropout_rate > 0 and random.random() < full_dropout_rate:
+            # 条件部分を全部補完側に移動
+            meta_condition_tags: list[str] = []
+            meta_remains_tags = meta_tags
+        else:
+            meta_condition_tags, meta_remains_tags = random_choose(
+                meta_tags, condition_rate
+            )  # condition_rateの確率でmeta_tagsを含める
         condition_tags = top_insert_tags + conditions + meta_condition_tags
 
         # オリジナルなら original タグを確率でドロップ

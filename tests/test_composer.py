@@ -74,6 +74,9 @@ def test_watermark_tags():
 
     assert len(group) > 0
     assert "watermark" in group
+    assert "weibo watermark" in group
+    assert "sample watermark" in group
+    assert "too many watermarks" in group
 
 
 def test_artistic_error_tags():
@@ -230,11 +233,13 @@ def test_prompt_compose_pretrain():
         frequency,
     )
 
-    prompt = composer.compose_pretrain(
-        general="full body, sitting, solo, watermark, 1girl",
-        copyright="vocaloid",
-        character="hatsune miku",
-        meta="watercolor (medium), character request, highres",
+    prompt = composer.compose_pretrain_list(
+        general_tags="full body, sitting, solo, watermark, 1girl, weibo watermark".split(
+            ", "
+        ),  # type: ignore
+        copyright_tags="vocaloid".split(", "),  # type: ignore
+        character_tags="hatsune miku".split(", "),  # type: ignore
+        meta_tags="watercolor (medium), character request, highres".split(", "),  # type: ignore
         rating="g",
         image_width=832,
         image_height=1152,
@@ -247,7 +252,7 @@ def test_prompt_compose_pretrain():
         "<|rating:general|><|aspect_ratio:tall|><|length:very_short|>"
         "<copyright>vocaloid</copyright>"
         "<character>hatsune miku</character>"
-        "<general>1girl, solo, watercolor (medium), highres, sitting, full body</general>"
+        "<general>1girl, solo, watercolor (medium), sitting, full body</general>"
         "<|eos|>"
     )
 
@@ -281,3 +286,35 @@ def test_prompt_compose_pretrain_list():
         "<general>1girl, solo, watercolor (medium), highres, sitting, full body</general>"
         "<|eos|>"
     )
+
+
+def test_prompt_compose_sft_list():
+    cluster = TagCluster.from_pretrained("data/cluster_map_1024c1.json")
+    frequency = TagFrequency.from_json("data/tag_frequency.json")
+
+    composer = TagComposer(
+        cluster,
+        frequency,
+    )
+
+    prompt = composer.compose_sft_list(
+        general_tags=[
+            "full body",
+            "sitting",
+            "solo",
+            "watermark",
+            "sample watermark",
+            "too many watermarks",
+            "1girl",
+        ],
+        copyright_tags=["vocaloid"],
+        character_tags=["hatsune miku"],
+        meta_tags=["watercolor (medium)", "character request", "highres"],
+        rating="g",
+        image_width=832,
+        image_height=1152,
+        temperature=1.0,
+        condition_rate=0.0,
+    )
+
+    assert "watermark" not in prompt
