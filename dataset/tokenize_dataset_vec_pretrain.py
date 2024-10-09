@@ -10,14 +10,14 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241009"
 
 NUM_PROC = 40
 
 SEED = 12345
 
 DO_SHUFFLE = True
-PUSH_REPO_ID = "p1atdev/202408-at20240906-tokenized-shuffle-1"
+PUSH_REPO_ID = "p1atdev/202408-at20240906-tokenized-shuffle-241009"
 
 
 def prepare_dataset():
