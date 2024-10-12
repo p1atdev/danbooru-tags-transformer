@@ -99,6 +99,7 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
         encoder_embeds: torch.FloatTensor,
         decoder_input_ids: torch.LongTensor,
         decoder_embeds: torch.FloatTensor,
+        encoder_attention_mask: torch.LongTensor | None = None,
     ):
         natural_token_mask = (
             (decoder_input_ids == self.config.natural_token_index)
@@ -106,11 +107,16 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
             .expand_as(decoder_embeds)
             .to(decoder_embeds.device)
         )
-        encoder_embeds = encoder_embeds.to(decoder_embeds.device, decoder_embeds.dtype)
+        _batch_size, _seq_len, dim = decoder_embeds.size()
+        if encoder_attention_mask is not None:
+            encoder_embeds = torch.masked_select(
+                encoder_embeds,
+                encoder_attention_mask.unsqueeze(-1).expand_as(encoder_embeds).bool(),
+            ).view(-1, dim)
 
         decoder_embeds = decoder_embeds.masked_scatter(
             natural_token_mask,
-            encoder_embeds,
+            encoder_embeds.to(decoder_embeds.device, decoder_embeds.dtype),
         )
 
         return decoder_embeds
@@ -135,6 +141,7 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
             encoder_embeds=projected_embeds,
             decoder_input_ids=decoder_input_ids,
             decoder_embeds=decoder_embeds,
+            encoder_attention_mask=encoder_attention_mask,
         )
 
         decoder_outputs = self.decoder_model(
@@ -205,6 +212,9 @@ if __name__ == "__main__":
             print(
                 f"Encoder embeddings: {encoder_embeds.shape} {encoder_embeds[:, :, 0]}",
             )
+            print(
+                f"Natural attention mask: {natural_encoded.attention_mask}",
+            )
 
             projected_embeds = model.projection(encoder_embeds)
             print(
@@ -224,6 +234,7 @@ if __name__ == "__main__":
                 encoder_embeds=projected_embeds,
                 decoder_input_ids=tag_encoded.input_ids,
                 decoder_embeds=decoder_embeds,
+                encoder_attention_mask=natural_encoded.attention_mask,
             )
 
             print(

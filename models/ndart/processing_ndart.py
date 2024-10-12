@@ -127,25 +127,30 @@ class NDartProcessor(ProcessorMixin):
     def insert_encoder_tokens_batch(
         self,
         encoder_input_ids: torch.LongTensor,  # (batch_size, seq_len)
-        encoder_attention_mask: torch.LongTensor,
         decoder_input_ids: torch.LongTensor,  # (batch_size, seq_len)
-        decoder_attention_mask: torch.LongTensor,
+        encoder_attention_mask: torch.LongTensor | None = None,  # (batch_size, seq_len)
+        decoder_attention_mask: torch.LongTensor | None = None,  # (batch_size, seq_len)
     ):
         new_input_ids = []
         new_attention_mask = []
 
-        encoder_token_lens = encoder_attention_mask.sum(dim=1)
+        encoder_token_lens = (
+            encoder_attention_mask.sum(dim=1)
+            if encoder_attention_mask is not None
+            else encoder_input_ids.size(1)
+        )
         # decoder_input_ids内のnatural_token_idの位置を取得
         positions = (decoder_input_ids == self.natural_token_id).nonzero(
             as_tuple=False
-        )[1]  # (batch_size, 1)
+        )[:, 1]  # (batch_index, in_batch_position) -> (in_batch_position)
 
-        for input_ids_i, attention_mask_i, position, encoder_len in zip(
-            decoder_input_ids,
-            decoder_attention_mask,
-            positions,
-            encoder_token_lens,
-            strict=True,
+        for i, (input_ids_i, position, encoder_len) in enumerate(
+            zip(
+                decoder_input_ids,
+                positions,
+                encoder_token_lens,
+                strict=True,
+            )
         ):
             # 置き換え用のトークンを準備 (1 x encoder_len の長さの self.natural_token_id のテンソル)
             replacement_tokens = torch.full(
@@ -166,16 +171,20 @@ class NDartProcessor(ProcessorMixin):
             )
             new_input_ids.append(new_input_ids_i)
 
-            new_attention_mask_i = torch.cat(
-                [
-                    attention_mask_i[:position] if position > 0 else torch.tensor([]),
-                    attention_mask_i,
-                    attention_mask_i[position + 1 :]
-                    if position + 1 < len(attention_mask_i)
-                    else torch.tensor([]),
-                ]
-            )
-            new_attention_mask.append(new_attention_mask_i)
+            if decoder_attention_mask is not None:
+                attention_mask_i = decoder_attention_mask[i]
+                new_attention_mask_i = torch.cat(
+                    [
+                        attention_mask_i[:position]
+                        if position > 0
+                        else torch.tensor([]),
+                        attention_mask_i,
+                        attention_mask_i[position + 1 :]
+                        if position + 1 < len(attention_mask_i)
+                        else torch.tensor([]),
+                    ]
+                )
+                new_attention_mask.append(new_attention_mask_i)
 
         # padding right
         new_input_ids = nn.utils.rnn.pad_sequence(
@@ -183,10 +192,14 @@ class NDartProcessor(ProcessorMixin):
             batch_first=True,
             padding_value=self.tag_tokenizer.pad_token_id,
         )
-        new_attention_mask = nn.utils.rnn.pad_sequence(
-            new_attention_mask,
-            batch_first=True,
-            padding_value=0,
+        new_attention_mask = (
+            nn.utils.rnn.pad_sequence(
+                new_attention_mask,
+                batch_first=True,
+                padding_value=0,
+            )
+            if new_attention_mask
+            else None
         )
         return new_input_ids, new_attention_mask
 
