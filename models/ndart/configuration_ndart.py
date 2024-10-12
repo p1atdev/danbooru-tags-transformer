@@ -12,13 +12,13 @@ class NDartConfig(PretrainedConfig):
         natural_config=None,
         tag_config=None,
         ignore_index=-100,
-        encoder_token_index=32000,
+        natural_token_index=32000,
         projector_hidden_act="gelu",
         natural_feature_layer=-1,
         **kwargs,
     ):
         self.ignore_index = ignore_index
-        self.encoder_token_index = encoder_token_index
+        self.natural_token_index = natural_token_index
         self.projector_hidden_act = projector_hidden_act
         self.natural_feature_layer = natural_feature_layer
 

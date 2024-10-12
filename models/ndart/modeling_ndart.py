@@ -94,136 +94,26 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
 
         self.post_init()
 
-    def fill_encoder_embedding_to_decoder_embed(
+    def _replace_natural_token_embeddings(
         self,
-        input_ids: torch.LongTensor,
-        decoder_embed: torch.FloatTensor,
-        decoder_attention_mask: torch.LongTensor,
-        encoder_embed: torch.FloatTensor,  # this is padded
-        encoder_attention_mask: torch.LongTensor,
+        encoder_embeds: torch.FloatTensor,
+        decoder_input_ids: torch.LongTensor,
+        decoder_embeds: torch.FloatTensor,
     ):
-        """
-        Fill the encoder embedding to the decoder embedding.
-
-        Given the input_ids and replace the natural_token_index with the encoder embedding.
-
-        Example inputs:
-        - natural_token_index = 32000
-        - input_ids = [
-            [1, 2, 3, 32000, 4, 5, 6, 7],           # 8 tokens
-            [1, 2, 32000, 8, 9, 0, 0, 0],           # 5 tokens with 3 padding (0 is pad token id)
-            [1, 32000, 10, 11, 12, 0, 0, 0],        # 5 tokens with 3 padding
-        ]
-        - decoder_embed = [
-            [1.1, 1.2, 1.3, 0.0, 1.4, 1.5, 1.6, 1.7],           # 8 tokens
-            [1.1, 1.2, 0.0, 1.3, 1.4, 0.0, 0.0, 0.0],                          # 5 tokens with 3 padding
-            [1.1, 0.0, 1.2, 1.3, 1.4, 0.0, 0.0, 0.0],                          # 5 tokens with 3 padding
-        ]
-        - decoder_attention_mask = [
-            [1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 0, 0, 0],
-            [1, 1, 1, 1, 1, 0, 0, 0],
-        ]
-        - encoder_embed = [
-            [0.1, 0.2, 0.3, 0.4],           # 4 tokens
-            [0.4, 0.5, 0.0, 0.0],           # 2 tokens with 2 padding
-            [0.7, 0.8, 0.9, 0.0],           # 3 tokens with 1 padding
-        ]
-        - encoder_attention_mask = [
-            [1, 1, 1, 1],                   # 4 tokens
-            [1, 1, 0, 0],                   # 2 tokens with 2 padding
-            [1, 1, 1, 0],                   # 3 tokens with 1 padding
-        ]
-
-        Return:
-        - filled_decoder_embed = [
-            [1.1, 1.2, 1.3, 0.1, 0.2, 0.3, 0.4, 1.4, 1.5, 1.6, 1.7],            # 8-1+4 tokens
-            [1.1, 1.2, 0.4, 0.5, 1.3, 1.4, 0.0, 0.0, 0.0, 0.0, 0.0],            # 5-1+2 tokens with 5 padding
-            [1.1, 0.7, 0.8, 0.9, 1.2, 1.3, 1.4, 0.0, 0.0, 0.0, 0.0],            # 5-1+3 tokens with 4 padding
-        ]
-        - filled_decoder_attention_mask = [
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],                                  # 8-1+4 tokens
-            [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0],                                  # 5-1+2 tokens with 5 padding
-            [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],                                  # 5-1+3 tokens with 4 padding
-        ]
-        """
-        batch_size, seq_len = input_ids.shape
-        embed_dim = decoder_embed.size(-1)
-        special_token_mask = (
-            input_ids == self.config.encoder_token_index
-        )  # (batch_size, seq_len)
-        num_special_tokens_per_sample = special_token_mask.sum(dim=1)  # (batch_size,)
-
-        encoder_seq_lens = encoder_attention_mask.sum(dim=1)  # (batch_size,)
-        new_seq_lens = seq_len - num_special_tokens_per_sample + encoder_seq_lens
-        max_new_seq_len = new_seq_lens.max().item()
-
-        filled_decoder_embed = decoder_embed.new_zeros(
-            (batch_size, max_new_seq_len, embed_dim)
+        natural_token_mask = (
+            (decoder_input_ids == self.config.natural_token_index)
+            .unsqueeze(-1)
+            .expand_as(decoder_embeds)
+            .to(decoder_embeds.device)
         )
-        filled_decoder_attention_mask = decoder_attention_mask.new_zeros(
-            (batch_size, max_new_seq_len)
+        encoder_embeds = encoder_embeds.to(decoder_embeds.device, decoder_embeds.dtype)
+
+        decoder_embeds = decoder_embeds.masked_scatter(
+            natural_token_mask,
+            encoder_embeds,
         )
 
-        for i in range(batch_size):
-            special_positions = torch.where(special_token_mask[i])[
-                0
-            ]  # positions of special tokens in input_ids[i]
-            dec_embed = decoder_embed[i]  # (seq_len, embed_dim)
-            dec_attn_mask = decoder_attention_mask[i]  # (seq_len,)
-            # dec_input_ids = input_ids[i]  # (seq_len,)
-
-            enc_embed = encoder_embed[i]  # (encoder_seq_len, embed_dim)
-            enc_seq_len = encoder_seq_lens[i].item()
-            enc_embed = enc_embed[:enc_seq_len]  # (enc_seq_len, embed_dim)
-            enc_attn_mask = encoder_attention_mask[i, :enc_seq_len]  # (enc_seq_len,)
-
-            # Initialize lists to store new embeddings and attention masks
-            new_embed_list = []
-            new_attn_mask_list = []
-
-            # Pointers to positions in decoder input
-            prev_pos = 0
-
-            # For each special token position
-            for sp_pos in special_positions:
-                sp_pos = sp_pos.item()
-                # Append embeddings and attention mask from previous position to special position
-                new_embed_list.append(
-                    dec_embed[prev_pos:sp_pos]
-                )  # embeddings from prev_pos to sp_pos-1
-                new_attn_mask_list.append(dec_attn_mask[prev_pos:sp_pos])
-
-                # Append encoder embeddings and attention mask
-                new_embed_list.append(enc_embed)
-                new_attn_mask_list.append(enc_attn_mask)
-
-                # Move the pointer
-                prev_pos = sp_pos + 1  # skip the special token
-
-            # Append remaining embeddings and attention mask after the last special token
-            new_embed_list.append(dec_embed[prev_pos:])
-            new_attn_mask_list.append(dec_attn_mask[prev_pos:])
-
-            # Concatenate all parts
-            new_embed = torch.cat(new_embed_list, dim=0)
-            new_attn_mask = torch.cat(new_attn_mask_list, dim=0)
-
-            # Pad to max_new_seq_len
-            pad_len = max_new_seq_len - new_embed.size(0)
-            if pad_len > 0:
-                new_embed = torch.cat(
-                    [new_embed, dec_embed.new_zeros((pad_len, embed_dim))], dim=0
-                )
-                new_attn_mask = torch.cat(
-                    [new_attn_mask, dec_attn_mask.new_zeros(pad_len)], dim=0
-                )
-
-            # Assign to filled tensors
-            filled_decoder_embed[i] = new_embed
-            filled_decoder_attention_mask[i] = new_attn_mask
-
-        return filled_decoder_embed, filled_decoder_attention_mask
+        return decoder_embeds
 
     def forward(
         self,
@@ -231,25 +121,25 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
         decoder_attention_mask: torch.LongTensor,
         encoder_input_ids: torch.LongTensor,
         encoder_attention_mask: torch.LongTensor,
+        labels: torch.LongTensor | None = None,
         **kwargs,
     ):
-        encoder_embed = self.encoder_model(encoder_input_ids).last_hidden_state
-        projected_embed = self.projection(encoder_embed)
+        encoder_embed = self.encoder_model(
+            input_ids=encoder_input_ids,
+            attention_mask=encoder_attention_mask,
+        ).last_hidden_state
+        projected_embeds = self.projection(encoder_embed)
 
-        decoder_embed = self.decoder_model.get_input_embeddings()(decoder_input_ids)
-        filled_decoder_embed, filled_decoder_attention_mask = (
-            self.fill_encoder_embedding_to_decoder_embed(
-                input_ids=decoder_input_ids,
-                decoder_embed=decoder_embed,
-                decoder_attention_mask=decoder_attention_mask,
-                encoder_embed=projected_embed,
-                encoder_attention_mask=encoder_attention_mask,
-            )
+        decoder_embeds = self.decoder_model.get_input_embeddings()(decoder_input_ids)
+        decoder_embeds = self._replace_natural_token_embeddings(
+            encoder_embeds=projected_embeds,
+            decoder_input_ids=decoder_input_ids,
+            decoder_embeds=decoder_embeds,
         )
 
         decoder_outputs = self.decoder_model(
-            inputs_embeds=filled_decoder_embed,
-            attention_mask=filled_decoder_attention_mask,
+            inputs_embeds=decoder_embeds,
+            attention_mask=decoder_attention_mask,
             **kwargs,
         )
 
@@ -272,13 +162,14 @@ if __name__ == "__main__":
     processor = NDartProcessor(
         natural_tokenizer=AutoTokenizer.from_pretrained(encoder_model),
         tag_tokenizer=AutoTokenizer.from_pretrained(decoder_model),
-        natural_token="<|natural|>",
+        natural_token="<|reserved_0|>",
     )
 
     model = NDartForConditionalGeneration._from_config(
         NDartConfig(
             natural_config=bert.config,
             tag_config=dart.config,
+            natural_token_index=processor.natural_token_id,
         )
     )
     model.encoder_model = bert
@@ -307,37 +198,34 @@ if __name__ == "__main__":
             print(
                 f"Encoder input_ids: {natural_encoded.input_ids}",
             )
-            encoder_embed = model.encoder_model(
-                natural_encoded.input_ids
+            encoder_embeds = model.encoder_model(
+                input_ids=natural_encoded.input_ids,
+                attention_mask=natural_encoded.attention_mask,
             ).last_hidden_state
             print(
-                f"Encoder embeddings: {encoder_embed.shape} {encoder_embed}",
+                f"Encoder embeddings: {encoder_embeds.shape} {encoder_embeds[:, :, 0]}",
             )
 
-            projected_embed = model.projection(encoder_embed)
+            projected_embeds = model.projection(encoder_embeds)
             print(
-                f"Projected embeddings: {projected_embed}",
+                f"Projected embeddings: {projected_embeds[:, :, 0]}",
             )
             print(
                 f"Decoder input_ids: {tag_encoded.input_ids}",
             )
-            decoder_embed = model.decoder_model.get_input_embeddings()(
-                tag_encoded.input_ids
+            decoder_embeds = model.decoder_model.get_input_embeddings()(
+                tag_encoded.input_ids,
             )
             print(
-                f"Decoder embeddings: {decoder_embed.shape} {decoder_embed}",
+                f"Decoder embeddings: {decoder_embeds.shape} {decoder_embeds[:, :, 0]}",
             )
 
-            filled_decoder_embed, filled_decoder_attention_mask = (
-                model.fill_encoder_embedding_to_decoder_embed(
-                    input_ids=tag_encoded.input_ids,
-                    decoder_embed=decoder_embed,
-                    decoder_attention_mask=tag_encoded.attention_mask,
-                    encoder_embed=projected_embed,
-                    encoder_attention_mask=natural_encoded.attention_mask,
-                )
+            replaced_decoder_embeds = model._replace_natural_token_embeddings(
+                encoder_embeds=projected_embeds,
+                decoder_input_ids=tag_encoded.input_ids,
+                decoder_embeds=decoder_embeds,
             )
 
             print(
-                f"Filled decoder embeddings: {filled_decoder_embed.shape} {filled_decoder_embed}",
+                f"Replaced decoder embeddings: {replaced_decoder_embeds.shape} {replaced_decoder_embeds[:, :, 0]}",
             )
