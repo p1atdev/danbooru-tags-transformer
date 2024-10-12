@@ -15,6 +15,7 @@ REVISION = "202408-at20240906"
 
 TEMPERATURE = 1.0
 CONDITION_RATE = 0.5
+FULL_DROPOUT_RATE = 0.05
 
 
 def map_format(examples, composer: TagComposer):
@@ -45,6 +46,7 @@ def map_format(examples, composer: TagComposer):
             image_height=examples["image_height"][i],
             temperature=TEMPERATURE,
             condition_rate=CONDITION_RATE,
+            full_dropout_rate=FULL_DROPOUT_RATE,
         )
         prompts.append(prompt)
 

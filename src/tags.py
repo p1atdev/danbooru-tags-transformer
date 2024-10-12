@@ -18,6 +18,8 @@ class TagCategoryTokens:
     CHARACTER_END = "</character>"
     COPYRIGHT_START = "<copyright>"
     COPYRIGHT_END = "</copyright>"
+    META_START = "<meta>"
+    META_END = "</meta>"
 
 
 # rating
@@ -42,20 +44,24 @@ class QualityTokens:
 
 # total tags length
 class LengthTokens:
+    LENGTH_TOO_SHORT = "<|length:too_short|>"
     LENGTH_VERY_SHORT = "<|length:very_short|>"
     LENGTH_SHORT = "<|length:short|>"
     LENGTH_MEDIUM = "<|length:medium|>"
     LENGTH_LONG = "<|length:long|>"
     LENGTH_VERY_LONG = "<|length:very_long|>"
+    LENGTH_TOO_LONG = "<|length:too_long|>"
 
 
 # aspect ratio, inspired by DanTagGen
 class AspectRatioTokens:
-    ASPECT_RATIO_ULTRA_WIDE = "<|aspect_ratio:ultra_wide|>"
-    ASPECT_RATIO_WIDE = "<|aspect_ratio:wide|>"
-    ASPECT_RATIO_SQUARE = "<|aspect_ratio:square|>"
+    ASPECT_RATIO_TOO_TALL = "<|aspect_ratio:too_tall|>"
+    ASPECT_RATIO_TALL_WALLPAPER = "<|aspect_ratio:tall_wallpaper|>"
     ASPECT_RATIO_TALL = "<|aspect_ratio:tall|>"
-    ASPECT_RATIO_ULTRA_TALL = "<|aspect_ratio:ultra_tall|>"
+    ASPECT_RATIO_SQUARE = "<|aspect_ratio:square|>"
+    ASPECT_RATIO_WIDE = "<|aspect_ratio:wide|>"
+    ASPECT_RATIO_WIDE_WALLPAPER = "<|aspect_ratio:wide_wallpaper|>"
+    ASPECT_RATIO_TOO_WIDE = "<|aspect_ratio:too_wide|>"
 
 
 # for SFT
@@ -85,14 +91,22 @@ class IdentityTokens:
 # multi modal inputs
 class MultiModalTokens:
     IMAGE_START = "<image>"
+    IMAGE_PLACEHOLDER = "<|image|>"
     IMAGE_END = "</image>"
     LINEART_START = "<lineart>"
+    LINEART_PLACEHOLDER = "<|lineart|>"
     LINEART_END = "</lineart>"
+    NATURAL_START = "<natural>"
+    NATURAL_PLACEHOLDER = "<|natural|>"
+    NATURAL_END = "</natural>"
     TAGGER_START = "<tagger>"
+    TAGGER_PLACEHOLDER = "<|tagger|>"
     TAGGER_END = "</tagger>"
     PROJECTION_START = "<projection>"
+    PROJECTION_PLACEHOLDER = "<|projection|>"
     PROJECTION_END = "</projection>"
     DESCRIBE_START = "<describe>"
+    DESCRIBE_PLACEHOLDER = "<|describe|>"
     DESCRIBE_END = "</describe>"
 
 

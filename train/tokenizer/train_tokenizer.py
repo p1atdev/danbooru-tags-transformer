@@ -28,7 +28,7 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 DATASET_REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-PUSH_HUB_NAME = "p1atdev/dart-v3-tokenizer-test"
+PUSH_HUB_NAME = "p1atdev/dart-v3-tokenizer-241009"
 
 
 SPECIAL_TOKENS = [
@@ -48,6 +48,8 @@ SPECIAL_TOKENS = [
     TagCategoryTokens.CHARACTER_END,
     TagCategoryTokens.COPYRIGHT_START,
     TagCategoryTokens.COPYRIGHT_END,
+    TagCategoryTokens.META_START,
+    TagCategoryTokens.META_END,
     #
     RatingTokens.RATING_SFW,
     RatingTokens.RATING_NSFW,
@@ -68,11 +70,13 @@ SPECIAL_TOKENS = [
     LengthTokens.LENGTH_LONG,
     LengthTokens.LENGTH_VERY_LONG,
     #
-    AspectRatioTokens.ASPECT_RATIO_ULTRA_WIDE,
-    AspectRatioTokens.ASPECT_RATIO_WIDE,
-    AspectRatioTokens.ASPECT_RATIO_SQUARE,
+    AspectRatioTokens.ASPECT_RATIO_TOO_TALL,
+    AspectRatioTokens.ASPECT_RATIO_TALL_WALLPAPER,
     AspectRatioTokens.ASPECT_RATIO_TALL,
-    AspectRatioTokens.ASPECT_RATIO_ULTRA_TALL,
+    AspectRatioTokens.ASPECT_RATIO_SQUARE,
+    AspectRatioTokens.ASPECT_RATIO_WIDE,
+    AspectRatioTokens.ASPECT_RATIO_WIDE_WALLPAPER,
+    AspectRatioTokens.ASPECT_RATIO_TOO_WIDE,
     #
     InstructionTokens.INPUT_START,
     InstructionTokens.INPUT_END,
@@ -91,14 +95,22 @@ SPECIAL_TOKENS = [
     IdentityTokens.IDENTITY_LEVEL_STRICT,
     #
     MultiModalTokens.IMAGE_START,
+    MultiModalTokens.IMAGE_PLACEHOLDER,
     MultiModalTokens.IMAGE_END,
     MultiModalTokens.LINEART_START,
+    MultiModalTokens.LINEART_PLACEHOLDER,
     MultiModalTokens.LINEART_END,
+    MultiModalTokens.NATURAL_START,
+    MultiModalTokens.NATURAL_PLACEHOLDER,
+    MultiModalTokens.NATURAL_END,
     MultiModalTokens.TAGGER_START,
+    MultiModalTokens.TAGGER_PLACEHOLDER,
     MultiModalTokens.TAGGER_END,
     MultiModalTokens.PROJECTION_START,
+    MultiModalTokens.PROJECTION_PLACEHOLDER,
     MultiModalTokens.PROJECTION_END,
     MultiModalTokens.DESCRIBE_START,
+    MultiModalTokens.DESCRIBE_PLACEHOLDER,
     MultiModalTokens.DESCRIBE_END,
     #
     *RESERVED_TOKENS,
@@ -244,8 +256,8 @@ def main():
     print(f"tokenizer.get_vocab_size(): {tokenizer.get_vocab_size()}")
 
     test_text = (
-        "<general>1girl, 2girls, aaa, long hair, very long hair, "
-        "honkai: star rail, arknights, hatsune miku, "
+        "<|aspect_ratio:tall|><general>1girl, 2girls, aaa, long hair, very long hair, "
+        "<copyright>honkai: star rail, arknights, hatsune miku, "
         "hogeeeeeeeee, <|input_end|>, <|pad|>"
     )
     print(f"test_text: {test_text}")

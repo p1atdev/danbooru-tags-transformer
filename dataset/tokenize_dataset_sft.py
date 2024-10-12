@@ -20,7 +20,7 @@ TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/cluster_map_1024c2.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241006-sft"
+PUSH_ID = "p1atdev/dart-v3-20241007-sft-2"
 
 YEAR_MIN = 2018
 
@@ -29,6 +29,8 @@ NUM_PROC = 40
 SEED = 12345
 
 DEBUG = False
+
+FULL_DROPOUT_RATE = 0.05  # general タグを全部条件から外す確率
 
 
 # べき乗を使ったランダムな値を生成する関数
@@ -73,13 +75,13 @@ def gaussian_distribution_random(
 
 # 条件とする確率を生成 (0.0 から 1.0 の範囲で0寄り多め)
 def get_condition_rate(batch_size: int = 1) -> list[float]:
-    rand = power_distribution_random(size=batch_size)
+    rand = power_distribution_random(n=1.25, size=batch_size)
     return rand.tolist()
 
 
 # temperature を生成 (0~2で1寄り)
 def get_temperature(batch_size: int = 1) -> list[float]:
-    rand = gaussian_distribution_random(size=batch_size)
+    rand = gaussian_distribution_random(mean=1.0, max_value=1.5, size=batch_size)
     return rand.tolist()
 
 
