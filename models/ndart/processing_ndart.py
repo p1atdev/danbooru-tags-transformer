@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import torch
 import torch.nn as nn
 
@@ -13,7 +15,6 @@ from transformers import (
     BatchFeature,
     PreTrainedTokenizerFast,
 )
-from transformers.activations import ACT2FN
 from transformers.processing_utils import ProcessingKwargs
 
 
@@ -28,9 +29,15 @@ class NDartProcessorKwargs:
     }
 
 
+@dataclass
+class NDartProcessingOutput:
+    natural: BatchFeature
+    tag: BatchFeature
+
+
 class NDartProcessor(ProcessorMixin):
     attributes = ["natural_tokenizer", "tag_tokenizer"]
-    valid_kwargs = ["chat_template", "patch_size", "natural_token"]
+    valid_kwargs = ["chat_template", "natural_token"]
     natural_tokenizer_class = "AutoTokenizer"
     tag_tokenizer_class = "AutoTokenizer"
 
@@ -42,17 +49,20 @@ class NDartProcessor(ProcessorMixin):
         natural_tokenizer=None,
         tag_tokenizer=None,
         natural_token="<|natural|>",
-        prompt_template=None,
+        chat_template=None,
         **kwargs,
     ):
         self.natural_token = natural_token
         super().__init__(
-            natural_tokenizer, tag_tokenizer, prompt_template=prompt_template, **kwargs
+            natural_tokenizer, tag_tokenizer, chat_template=chat_template, **kwargs
         )
 
     def __call__(
-        self, natural_text: str | None = None, tag_text: str | None = None, **kwargs
-    ) -> BatchFeature:
+        self,
+        natural_text: str | list[str] | None = None,
+        tag_text: str | list[str] | None = None,
+        **kwargs,
+    ) -> NDartProcessingOutput:
         if tag_text is None:
             raise ValueError("tag_text is required for NDartProcessor")
 
@@ -79,12 +89,10 @@ class NDartProcessor(ProcessorMixin):
 
         natural_output_kwargs = {
             **NDartProcessorKwargs._defaults["natural_kwargs"],
-            **self.natural_tokenizer.init_kwargs,
             **kwargs,
         }
         tag_output_kwargs = {
             **NDartProcessorKwargs._defaults["tag_kwargs"],
-            **self.tag_tokenizer.init_kwargs,
             **kwargs,
         }
 
@@ -97,11 +105,9 @@ class NDartProcessor(ProcessorMixin):
             **tag_output_kwargs,
         )
 
-        return BatchFeature(
-            data={
-                "natural": natural_tokens,
-                "tag": tag_tokens,
-            }
+        return NDartProcessingOutput(
+            natural=BatchFeature(data={**natural_tokens}),
+            tag=BatchFeature(data={**tag_tokens}),
         )
 
     # Copied from transformers.models.clip.processing_clip.CLIPProcessor.decode with CLIP->PreTrained
@@ -120,6 +126,17 @@ class NDartProcessor(ProcessorMixin):
         """
         return self.tag_tokenizer.decode(*args, **kwargs)
 
-    # @property
-    # def model_input_names(self):
-    #     return
+    @property
+    def model_input_names(self):
+        return ["natural_text", "tag_text"]
+
+
+if __name__ == "__main__":
+    natural_tokenizer = AutoTokenizer.from_pretrained("intfloat/multilingual-e5-small")
+    tag_tokenizer = AutoTokenizer.from_pretrained("p1atdev/dart-v3-tokenizer-241010")
+    processor = NDartProcessor(
+        natural_tokenizer=natural_tokenizer,
+        tag_tokenizer=tag_tokenizer,
+    )
+    output = processor("Hello, world!", "<|natural|><general>1girl, solo")
+    print(output)
