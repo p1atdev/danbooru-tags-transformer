@@ -187,12 +187,12 @@ class NDartProcessor(ProcessorMixin):
                 new_attention_mask.append(new_attention_mask_i)
 
         # padding right
-        new_input_ids = nn.utils.rnn.pad_sequence(
+        new_input_ids_tensor = nn.utils.rnn.pad_sequence(
             new_input_ids,
             batch_first=True,
             padding_value=self.tag_tokenizer.pad_token_id,
         )
-        new_attention_mask = (
+        new_attention_mask_tensor = (
             nn.utils.rnn.pad_sequence(
                 new_attention_mask,
                 batch_first=True,
@@ -201,7 +201,7 @@ class NDartProcessor(ProcessorMixin):
             if new_attention_mask
             else None
         )
-        return new_input_ids, new_attention_mask
+        return new_input_ids_tensor, new_attention_mask_tensor
 
     # Copied from transformers.models.clip.processing_clip.CLIPProcessor.decode with CLIP->PreTrained
     def batch_decode(self, *args, **kwargs):

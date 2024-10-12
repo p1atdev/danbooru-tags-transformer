@@ -96,9 +96,9 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
 
     def _replace_natural_token_embeddings(
         self,
-        encoder_embeds: torch.FloatTensor,
+        encoder_embeds: torch.Tensor,
         decoder_input_ids: torch.LongTensor,
-        decoder_embeds: torch.FloatTensor,
+        decoder_embeds: torch.Tensor,
         encoder_attention_mask: torch.LongTensor | None = None,
     ):
         natural_token_mask = (
@@ -149,6 +149,8 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
             attention_mask=decoder_attention_mask,
             **kwargs,
         )
+
+        # TODO: loss calculation
 
         return decoder_outputs
 
