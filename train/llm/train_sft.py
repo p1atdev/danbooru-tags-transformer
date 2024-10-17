@@ -25,11 +25,11 @@ SEED = 20241006
 # pretrained model
 BASE_MODEL_NAME = "p1atdev/dart-v3-llama-8L-241005"
 
-DATASET_NAME = "p1atdev/dart-v3-20241006-sft"
+DATASET_NAME = "p1atdev/dart-v3-20241008-sft"
 
 PROJECT_NAME = "danbooru-tags-transformer-v3"
-PUSH_HUB_NAME = "p1atdev/dart-v3-llama-8L-241005_241006-sft"
-SAVE_DIR = "./output/dart-llama-8L-241005_241006-sft"
+PUSH_HUB_NAME = "p1atdev/dart-v3-llama-8L-241005_241008-sft-2"
+SAVE_DIR = "./output/dart-llama-8L-241005_241008-sft-2"
 
 NUM_PROC = 4
 
@@ -79,10 +79,11 @@ def main():
         per_device_train_batch_size=64,
         per_device_eval_batch_size=32,
         gradient_accumulation_steps=2,
-        learning_rate=1e-4,
+        learning_rate=2e-4,
         warmup_steps=1000,
         weight_decay=0.01,
         optim="ademamix",
+        adam_epsilon=1e-10,
         lr_scheduler_type="cosine_with_restarts",
         lr_scheduler_kwargs={"num_cycles": 1},
         evaluation_strategy="steps",

@@ -20,17 +20,17 @@ import wandb
 SEED = 20241004
 
 # word embedding base
-EMBEDDING_MODEL = "p1atdev/dart-v3-vectors-opt_7-shuffled"
+EMBEDDING_MODEL = "p1atdev/dart-v3-vectors-opt_17-shuffled"
 
-TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
-DATASET_NAME = "p1atdev/dart-v3-20241005-pretrain"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
+DATASET_NAME = "p1atdev/dart-v3-20241018-pretrain"
 
 MODEL_TYPE = "llama"
 MODEL_SIZE = "8layers"
 
 PROJECT_NAME = "danbooru-tags-transformer-v3"
-PUSH_HUB_NAME = "p1atdev/dart-v3-llama-8L-241005"
-SAVE_DIR = "./output/dart-llama-8L-241005"
+PUSH_HUB_NAME = "p1atdev/dart-v3-llama-8L-241018-1"
+SAVE_DIR = "./output/dart-llama-8L-241018-1"
 
 
 def prepare_models():
@@ -104,11 +104,15 @@ def main():
         per_device_eval_batch_size=32,
         gradient_accumulation_steps=2,
         learning_rate=5e-4,
-        warmup_steps=2500,
+        warmup_ratio=0.01,  # 1%
         weight_decay=0.01,
         optim="ademamix",
-        lr_scheduler_type="cosine_with_restarts",
-        lr_scheduler_kwargs={"num_cycles": 2},
+        lr_scheduler_type="cosine_with_min_lr",
+        lr_scheduler_kwargs={
+            "min_lr": 5e-5,
+            "num_cycles": 0.5,
+            # "num_warmup_steps": 1000,
+        },
         evaluation_strategy="steps",
         eval_steps=1000,
         save_steps=1000,
