@@ -16,13 +16,13 @@ import wandb
 
 SEED = 20240913
 
-TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
-DATASET_NAME = "p1atdev/202408-at20240906-tokenized-shuffle-1"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
+DATASET_NAME = "p1atdev/202408-at20240906-tokenized-shuffle-241014"
 CONFIG_PATH = "./config/opt/125m.json"
 
 PROJECT_NAME = "dart-v3-vectors"
-PUSH_HUB_NAME = "p1atdev/dart-v3-vectors-opt_7-shuffled"
-SAVE_DIR = "./output/vec_opt_7"
+PUSH_HUB_NAME = "p1atdev/dart-v3-vectors-opt_17-shuffled"
+SAVE_DIR = "./output/vec_opt_17"
 
 
 def prepare_models():
@@ -76,22 +76,23 @@ def main():
         overwrite_output_dir=True,
         num_train_epochs=5,
         # auto_find_batch_size=True,
-        per_device_train_batch_size=32,
+        per_device_train_batch_size=64,
         per_device_eval_batch_size=32,
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=2,
         learning_rate=5e-4,
         warmup_ratio=0.01,  # 1% of total steps
         weight_decay=0.1,
         optim="adamw_torch_fused",
+        adam_epsilon=1e-8,
         lr_scheduler_type="cosine_with_min_lr",
         lr_scheduler_kwargs={
-            "min_lr": 1e-5,
+            "min_lr": 5e-5,
             "num_cycles": 0.5,
             # "num_warmup_steps": 1000,
         },
         evaluation_strategy="steps",
-        eval_steps=200,
-        save_steps=200,
+        eval_steps=1000,
+        save_steps=1000,
         save_total_limit=2,
         logging_steps=1,
         logging_first_step=True,

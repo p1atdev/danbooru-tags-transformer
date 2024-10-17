@@ -4,20 +4,20 @@ import numpy as np
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
-MAX_LENGTH = 256
+MAX_LENGTH = 384
 
 DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241009"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 
 NUM_PROC = 40
 
 SEED = 12345
 
 DO_SHUFFLE = True
-PUSH_REPO_ID = "p1atdev/202408-at20240906-tokenized-shuffle-241009"
+PUSH_REPO_ID = "p1atdev/202408-at20240906-tokenized-shuffle-241015-384ktokens"
 
 
 def prepare_dataset():
@@ -31,6 +31,21 @@ def prepare_tokenizer():
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
 
     return tokenizer
+
+
+def map_text(examples: Dataset):
+    texts = []
+
+    for i, id in enumerate(examples["id"]):
+        general = examples["general"][i]
+        # character = examples["character"][i]
+        # copyright = examples["copyright"][i]
+        # meta = examples["meta"][i]
+
+        # text = f"{general}, {character}, {copyright}, {meta}"
+        texts.append(general)
+
+    return {"text": texts}
 
 
 def tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
@@ -59,9 +74,13 @@ def main():
     tokenizer = prepare_tokenizer()
 
     # rename column "general" to "text"
-    ds = ds.rename_column("general", "text")
-    other_column_names = [col for col in ds.column_names if col != "text"]
-    ds = ds.remove_columns(other_column_names)
+    ds = ds.map(
+        map_text,
+        batched=True,
+        batch_size=1024,
+        num_proc=NUM_PROC,
+        remove_columns=ds.column_names,
+    )
 
     # filter out empty text
     ds = ds.filter(
@@ -81,6 +100,13 @@ def main():
     # filter out short input_ids
     ds = ds.filter(
         lambda x: len(x["input_ids"]) > 10,
+        batched=False,
+        num_proc=NUM_PROC,
+    )
+
+    # filter out too long input_ids
+    ds = ds.filter(
+        lambda x: len(x["input_ids"]) <= MAX_LENGTH,
         batched=False,
         num_proc=NUM_PROC,
     )

@@ -110,5 +110,12 @@ class MultiModalTokens:
     DESCRIBE_END = "</describe>"
 
 
+# translation level
+class TranslationTokens:
+    TRANSLATE_EXACT = "<|translate:exact|>"
+    TRANSLATE_APPROX = "<|translate:approx|>"
+    TRANSLATE_CREATIVE = "<|translate:creative|>"
+
+
 # reserved
 RESERVED_TOKENS = [f"<|reserved_{i}|>" for i in range(64)]
