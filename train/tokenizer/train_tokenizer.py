@@ -21,6 +21,7 @@ from src.tags import (
     InstructionTokens,
     IdentityTokens,
     MultiModalTokens,
+    TranslationTokens,
     RESERVED_TOKENS,
 )
 
@@ -28,7 +29,7 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 DATASET_REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-PUSH_HUB_NAME = "p1atdev/dart-v3-tokenizer-241009"
+PUSH_HUB_NAME = "p1atdev/dart-v3-tokenizer-241010"
 
 
 SPECIAL_TOKENS = [
@@ -112,6 +113,10 @@ SPECIAL_TOKENS = [
     MultiModalTokens.DESCRIBE_START,
     MultiModalTokens.DESCRIBE_PLACEHOLDER,
     MultiModalTokens.DESCRIBE_END,
+    #
+    TranslationTokens.TRANSLATE_EXACT,
+    TranslationTokens.TRANSLATE_APPROX,
+    TranslationTokens.TRANSLATE_CREATIVE,
     #
     *RESERVED_TOKENS,
 ]
@@ -258,7 +263,7 @@ def main():
     test_text = (
         "<|aspect_ratio:tall|><general>1girl, 2girls, aaa, long hair, very long hair, "
         "<copyright>honkai: star rail, arknights, hatsune miku, "
-        "hogeeeeeeeee, <|input_end|>, <|pad|>"
+        "hogeeeeeeeee, <|translate:creative|><|input_end|>, <|pad|>"
     )
     print(f"test_text: {test_text}")
     print(f"tokenizer.encode(test_text): {tokenizer.encode(test_text).tokens}")
