@@ -13,11 +13,11 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241009"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 FREQUENCY_PATH = "data/tag_frequency.json"
-CLUSTER_PATH = "data/cluster_map_1024c2.json"
+CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241009-pretrain-debug"
+PUSH_ID = "p1atdev/dart-v3-20241018-pretrain"
 
 TEMPERATURE = 1.0
 CONDITION_RATE = 0.0
@@ -26,7 +26,7 @@ NUM_PROC = 40
 
 SEED = 12345
 
-DEBUG = True
+DEBUG = False
 
 
 def prepare_dataset():

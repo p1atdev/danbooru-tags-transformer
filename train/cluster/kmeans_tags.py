@@ -17,7 +17,7 @@ def prepare_args():
         "--output_path", "-o", type=str, default="data/cluster_map.json"
     )
     parser.add_argument(
-        "--general_tags",
+        "--tags",
         type=str,
         default="data/general_tags.txt",
     )
@@ -30,17 +30,17 @@ def train_cluster(
     n_clusters: int = 1440,
     n_init: int = 25,
     max_iter: int = 250,
-    general_tags_path: str = "data/general_tags.txt",
+    tags_path: str = "data/general_tags.txt",
 ):
-    with open(general_tags_path, "r") as f:
-        general_tags = f.read().splitlines()
+    with open(tags_path, "r") as f:
+        tags = f.read().splitlines()
 
     cluster = TagCluster.train_from_embedding_model(
         embedding_model_name=model_name,
         n_clusters=n_clusters,
         n_init=n_init,  # こっち増やした方が良さそう
         max_iter=max_iter,  # これは増やさなくて良さそう
-        tag_list=general_tags,
+        tag_list=tags,
     )
 
     return cluster
@@ -56,7 +56,7 @@ def main():
         n_clusters=args.n_clusters,
         n_init=args.n_init,
         max_iter=args.max_iter,
-        general_tags_path=args.general_tags,
+        tags_path=args.tags,
     )
 
     cluster.save_pretrained(output_path)
