@@ -403,14 +403,14 @@ class TagComposer:
         ok_meta_tags = []
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
-                for tag in meta_tags:  # 部分的にでも含まれていたら
+                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
                     if tag_part in tag:
                         if predefined.tag_type == PredefinedTagType.BAN:
                             # BAN row
                             return None
                         elif predefined.tag_type == PredefinedTagType.REMOVE:
                             # just remove
-                            # meta_tags.remove(tag)
+                            meta_tags.remove(tag)
                             continue
                         elif predefined.tag_type == PredefinedTagType.INSERT_START:
                             # do nothing
@@ -495,14 +495,14 @@ class TagComposer:
         ok_meta_tags = []
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
-                for tag in meta_tags:  # 部分的にでも含まれていたら
+                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
                     if tag_part in tag:
                         if predefined.tag_type == PredefinedTagType.BAN:
                             # BAN row
                             return None
                         elif predefined.tag_type == PredefinedTagType.REMOVE:
                             # just remove
-                            # meta_tags.remove(tag)
+                            meta_tags.remove(tag)
                             continue
                         elif predefined.tag_type == PredefinedTagType.INSERT_START:
                             # do nothing

@@ -18,13 +18,20 @@ def is_too_long_tags(character_tags: list[str], general_tags: list[str]):
 def get_length_tag(length: int):
     """Get the length tag from the length."""
 
+    # if length <= 16:  # 15% (+15%)
+    #     return LengthTokens.LENGTH_VERY_SHORT
+    # elif length <= 22:  # 35% (+20%)
+    #     return LengthTokens.LENGTH_SHORT
+    # elif length <= 33:  # 65% (+30%)
+    #     return LengthTokens.LENGTH_MEDIUM
+    # elif length <= 44:  # 85% (+20%)
+    #     return LengthTokens.LENGTH_LONG
+    # else:  # 100% (+15%)
+    #     return LengthTokens.LENGTH_VERY_LONG
+
     if length <= 16:  # 15% (+15%)
         return LengthTokens.LENGTH_VERY_SHORT
-    elif length <= 22:  # 35% (+20%)
-        return LengthTokens.LENGTH_SHORT
-    elif length <= 33:  # 65% (+30%)
+    elif length <= 44:  # 85% (+70%)
         return LengthTokens.LENGTH_MEDIUM
-    elif length <= 44:  # 85% (+20%)
-        return LengthTokens.LENGTH_LONG
     else:  # 100% (+15%)
         return LengthTokens.LENGTH_VERY_LONG
