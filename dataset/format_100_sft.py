@@ -36,7 +36,8 @@ def map_format(examples, composer: TagComposer):
         copyright = [] if copyright is None else copyright.split(", ")
         meta = [] if meta is None else meta.split(", ")
 
-        prompt = composer.compose_sft_list(
+        # prompt = composer.compose_sft_list(
+        prompt = composer.compose_sft_use_list(
             general_tags=general,
             copyright_tags=copyright,
             character_tags=character,

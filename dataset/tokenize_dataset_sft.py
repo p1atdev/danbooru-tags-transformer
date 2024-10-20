@@ -16,13 +16,13 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-240912"
+TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 FREQUENCY_PATH = "data/tag_frequency.json"
-CLUSTER_PATH = "data/cluster_map_1024c2.json"
+CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241007-sft-2"
+PUSH_ID = "p1atdev/dart-v3-20241019-sft-use-1"
 
-YEAR_MIN = 2018
+YEAR_MIN = 2017
 
 NUM_PROC = 40
 
@@ -175,7 +175,8 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
     for i, (condition_rate, temperature) in enumerate(
         zip(condition_rates, temperatures, strict=True)
     ):
-        prompt = composer.compose_sft_list(
+        # prompt = composer.compose_sft_list(
+        prompt = composer.compose_sft_use_list(
             general_tags=examples["general"][i],
             copyright_tags=examples["copyright"][i],
             character_tags=examples["character"][i],

@@ -17,7 +17,7 @@ TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241018-pretrain"
+PUSH_ID = "p1atdev/dart-v3-20241018-pretrain-2"
 
 TEMPERATURE = 1.0
 CONDITION_RATE = 0.0

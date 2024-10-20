@@ -12,7 +12,11 @@ from .rating import get_rating_tag, get_ambitious_rating_tag, SHORT_RATING_TAG
 from .aspect_ratio import calculate_aspect_ratio_tag, is_extreme_aspect_ratio
 from .length import get_length_tag, is_too_long_tags
 from .cluster import TagCluster
-from .formatter import format_completion, format_sft_with_initial_condition
+from .formatter import (
+    format_completion,
+    format_sft_with_initial_condition,
+    format_sft_with_use_condition,
+)
 
 
 def random_choose(tags: list[str], rate: float) -> tuple[list[str], list[str]]:
@@ -543,6 +547,121 @@ class TagComposer:
 
         # テンプレートに適用
         prompt = format_sft_with_initial_condition(
+            rating_aspect_ratio_length=rating_aspect_ratio_length,  # shuffled
+            condition=condition_tags,  # shuffled
+            copyright=copyright_tags,  # shuffled
+            character=character_tags,  # shuffled
+            meta_general=meta_general,
+        )
+
+        return prompt
+
+    def compose_sft_use_list(
+        self,
+        general_tags: list[str],
+        copyright_tags: list[str],
+        character_tags: list[str],
+        meta_tags: list[str],
+        rating: SHORT_RATING_TAG,
+        image_width: int,
+        image_height: int,
+        temperature: float = 1.0,
+        condition_rate: float = 0.0,
+        full_dropout_rate: float = 0.05,  # 5%の確率で全てのgeneralタグをドロップして条件に含めない
+    ) -> str | None:  # returns None if the prompt should be skipped
+        # タグを取得
+        if is_extreme_aspect_ratio(image_width, image_height):
+            return None
+        aspect_ratio_tag = calculate_aspect_ratio_tag(image_width, image_height)
+
+        # ほかのタグ
+        rating_tag = get_rating_tag(rating)
+        length_tag = get_length_tag(len(general_tags))
+
+        assert isinstance(general_tags, list)
+        if len(general_tags) == 0:
+            return None
+
+        is_full_dropout = full_dropout_rate > 0 and random.random() < full_dropout_rate
+
+        # タグをソート
+        high_priorities, conditions, low_priorities = (
+            self.selector.separate_and_sort_tags(
+                general_tags,
+                condition_rate=condition_rate,
+                temperature=temperature,
+            )
+        )
+        # use の時は条件も生成部分に追加する
+        low_priorities.extend(conditions)
+        low_priorities = self.selector.sort_tags_by_frequency(low_priorities)
+        if is_full_dropout:
+            # 条件なし
+            conditions = []
+
+        top_insert_tags = []
+        for tags, predefined in zip(
+            high_priorities, self.selector.high_priority_groups, strict=True
+        ):
+            if predefined.tag_type == PredefinedTagType.BAN:
+                if len(tags) > 0:
+                    # BAN row
+                    return None
+            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                # just remove
+                continue
+            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                top_insert_tags.extend(tags)
+
+        assert isinstance(meta_tags, list)
+        ok_meta_tags = []
+        for predefined in self.predefined_meta_tags:
+            for tag_part in predefined.tags:
+                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
+                    if tag_part in tag:
+                        if predefined.tag_type == PredefinedTagType.BAN:
+                            # BAN row
+                            return None
+                        elif predefined.tag_type == PredefinedTagType.REMOVE:
+                            # just remove
+                            meta_tags.remove(tag)
+                            continue
+                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                            # do nothing
+                            ok_meta_tags.append(tag)
+        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
+
+        # 条件部分
+        if is_full_dropout:
+            # 条件部分を全部補完側に移動
+            meta_condition_tags: list[str] = []
+            meta_remains_tags = meta_tags
+            condition_tags = []
+        else:
+            meta_condition_tags, meta_remains_tags = random_choose(
+                meta_tags, condition_rate
+            )  # condition_rateの確率でmeta_tagsを含める
+            condition_tags = top_insert_tags + conditions + meta_condition_tags
+
+        # オリジナルなら original タグを確率でドロップ
+        if copyright_tags == ["original"] and character_tags == []:
+            if random.random() < 0.5:  # 50%の確率でドロップ
+                copyright_tags = []
+
+        # シャッフル
+        random.shuffle(condition_tags)
+        random.shuffle(character_tags)
+        random.shuffle(copyright_tags)
+
+        # まとめてシャッフル
+        rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
+        random.shuffle(rating_aspect_ratio_length)
+
+        # 生成部分
+        meta_general = top_insert_tags + meta_remains_tags + low_priorities
+
+        # テンプレートに適用
+        prompt = format_sft_with_use_condition(
             rating_aspect_ratio_length=rating_aspect_ratio_length,  # shuffled
             condition=condition_tags,  # shuffled
             copyright=copyright_tags,  # shuffled

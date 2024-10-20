@@ -75,6 +75,32 @@ TAG_INITIAL_CONDITION_TEMPLATE = (
     f"{EOS}"
 ).strip()
 
+# 必須要件を含むテンプレート
+TAG_USE_CONDITION_TEMPLATE = (
+    f"{BOS}"
+    #
+    "{rating_aspect_ratio_length}"  # shuffle
+    #
+    f"{COPYRIGHT_START}"
+    "{copyright}"
+    f"{COPYRIGHT_END}"
+    #
+    f"{CHARACTER_START}"
+    "{character}"
+    f"{CHARACTER_END}"
+    #
+    f"{USE_START}"
+    "{condition}"
+    f"{USE_END}"
+    #
+    f"{GENERAL_START}"
+    f"{INPUT_END}"  #! instruction end
+    "{meta_general}"
+    f"{GENERAL_END}"
+    #
+    f"{EOS}"
+).strip()
+
 TAG_RESTRICTION_CONDITION_TEMPLATE = (
     f"{BOS}"
     #
@@ -180,6 +206,22 @@ def format_sft_with_initial_condition(
     rating_aspect_ratio_length: list[str],
 ):
     return TAG_INITIAL_CONDITION_TEMPLATE.format(
+        rating_aspect_ratio_length="".join(rating_aspect_ratio_length),
+        condition=", ".join(condition),
+        copyright=", ".join(copyright),
+        character=", ".join(character),
+        meta_general=", ".join(meta_general),
+    )
+
+
+def format_sft_with_use_condition(
+    condition: list[str],
+    copyright: list[str],
+    character: list[str],
+    meta_general: list[str],
+    rating_aspect_ratio_length: list[str],
+):
+    return TAG_USE_CONDITION_TEMPLATE.format(
         rating_aspect_ratio_length="".join(rating_aspect_ratio_length),
         condition=", ".join(condition),
         copyright=", ".join(copyright),
