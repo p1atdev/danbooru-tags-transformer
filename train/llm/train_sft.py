@@ -127,8 +127,8 @@ def main():
 if __name__ == "__main__":
     main()
 
-    # debug
-    _tokenizer, model = prepare_models()
-    print(model)
+    # # debug
+    # _tokenizer, model = prepare_models()
+    # print(model)
 
-    model.push_to_hub(PUSH_HUB_NAME, private=True)
+    # model.push_to_hub(PUSH_HUB_NAME, private=True)
