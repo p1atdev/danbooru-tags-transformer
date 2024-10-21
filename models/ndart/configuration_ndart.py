@@ -1,5 +1,4 @@
 from transformers.configuration_utils import PretrainedConfig
-from transformers.utils import logging
 from transformers.models.auto import CONFIG_MAPPING
 
 

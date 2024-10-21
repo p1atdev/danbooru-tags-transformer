@@ -1,56 +1,46 @@
-from dataclasses import dataclass
-from collections import UserDict
-
 import torch
 import torch.nn as nn
 
 from transformers import (
-    AutoModelForTextEncoding,
-    AutoModelForCausalLM,
-    LlamaForCausalLM,
-    BertModel,
-    PreTrainedTokenizerBase,
     PreTrainedTokenizer,
     AutoTokenizer,
     ProcessorMixin,
-    GenerationMixin,
     BatchFeature,
 )
-from transformers.processing_utils import ProcessingKwargs
 
 
 class NDartProcessorKwargs:
     _defaults = {
-        "natural_kwargs": {
+        "encoder_kwargs": {
             "padding": True,
         },
-        "tag_kwargs": {
+        "decoder_kwargs": {
             "padding": True,
         },
     }
 
 
 class NDartProcessor(ProcessorMixin):
-    attributes = ["natural_tokenizer", "tag_tokenizer"]
+    attributes = ["encoder_tokenizer", "decoder_tokenizer"]
     valid_kwargs = ["chat_template", "natural_token"]
-    natural_tokenizer_class = "AutoTokenizer"
-    tag_tokenizer_class = "AutoTokenizer"
+    encoder_tokenizer_class = "AutoTokenizer"
+    decoder_tokenizer_class = "AutoTokenizer"
 
-    natural_tokenizer: PreTrainedTokenizer
-    tag_tokenizer: PreTrainedTokenizer
+    encoder_tokenizer: PreTrainedTokenizer
+    decoder_tokenizer: PreTrainedTokenizer
 
     def __init__(
         self,
-        natural_tokenizer=None,
-        tag_tokenizer=None,
+        encoder_tokenizer=None,
+        decoder_tokenizer=None,
         natural_token="<|natural|>",
         chat_template=None,
         **kwargs,
     ):
         super().__init__(
-            natural_tokenizer, tag_tokenizer, chat_template=chat_template, **kwargs
+            encoder_tokenizer, decoder_tokenizer, chat_template=chat_template, **kwargs
         )
-        self.natural_token_id: int = self.tag_tokenizer.convert_tokens_to_ids(
+        self.natural_token_id: int = self.decoder_tokenizer.convert_tokens_to_ids(
             natural_token
         )
 
@@ -85,21 +75,21 @@ class NDartProcessor(ProcessorMixin):
         tag_text = _normalize_text_input(tag_text)
 
         natural_output_kwargs = {
-            **NDartProcessorKwargs._defaults["natural_kwargs"],
+            **NDartProcessorKwargs._defaults["encoder_kwargs"],
             "return_tensors": "pt",
             **kwargs,
         }
         tag_output_kwargs = {
-            **NDartProcessorKwargs._defaults["tag_kwargs"],
+            **NDartProcessorKwargs._defaults["decoder_kwargs"],
             "return_tensors": "pt",
             **kwargs,
         }
 
-        natural_tokens = self.natural_tokenizer(
+        natural_tokens = self.encoder_tokenizer(
             natural_text,
             **natural_output_kwargs,
         )
-        tag_tokens = self.tag_tokenizer(
+        tag_tokens = self.decoder_tokenizer(
             tag_text,
             **tag_output_kwargs,
         )
@@ -191,7 +181,7 @@ class NDartProcessor(ProcessorMixin):
         new_input_ids_tensor = nn.utils.rnn.pad_sequence(
             new_input_ids,
             batch_first=True,
-            padding_value=self.tag_tokenizer.pad_token_id,
+            padding_value=self.decoder_tokenizer.pad_token_id,
         )
         new_attention_mask_tensor = (
             nn.utils.rnn.pad_sequence(
@@ -210,7 +200,7 @@ class NDartProcessor(ProcessorMixin):
         This method forwards all its arguments to PreTrainedTokenizerFast's [`~PreTrainedTokenizer.batch_decode`]. Please
         refer to the docstring of this method for more information.
         """
-        return self.tag_tokenizer.batch_decode(*args, **kwargs)
+        return self.decoder_tokenizer.batch_decode(*args, **kwargs)
 
     # Copied from transformers.models.clip.processing_clip.CLIPProcessor.decode with CLIP->PreTrained
     def decode(self, *args, **kwargs):
@@ -218,7 +208,7 @@ class NDartProcessor(ProcessorMixin):
         This method forwards all its arguments to PreTrainedTokenizerFast's [`~PreTrainedTokenizer.decode`]. Please refer to
         the docstring of this method for more information.
         """
-        return self.tag_tokenizer.decode(*args, **kwargs)
+        return self.decoder_tokenizer.decode(*args, **kwargs)
 
     @property
     def model_input_names(self):
@@ -226,11 +216,13 @@ class NDartProcessor(ProcessorMixin):
 
 
 if __name__ == "__main__":
-    natural_tokenizer = AutoTokenizer.from_pretrained("intfloat/multilingual-e5-small")
-    tag_tokenizer = AutoTokenizer.from_pretrained("p1atdev/dart-v3-tokenizer-241010")
+    encoder_tokenizer = AutoTokenizer.from_pretrained("intfloat/multilingual-e5-small")
+    decoder_tokenizer = AutoTokenizer.from_pretrained(
+        "p1atdev/dart-v3-tokenizer-241010"
+    )
     processor = NDartProcessor(
-        natural_tokenizer=natural_tokenizer,
-        tag_tokenizer=tag_tokenizer,
+        encoder_tokenizer=encoder_tokenizer,
+        decoder_tokenizer=decoder_tokenizer,
         natural_token="<|natural|>",
     )
     output = processor("Hello, world!", "<|natural|><general>1girl, solo")
