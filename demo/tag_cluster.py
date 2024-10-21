@@ -14,43 +14,48 @@ CLUSTER = {
         "label2cluster": None,
         "cluster2labels": None,
     },
-    "1152-1": {
-        "path": "data/cluster_map_1152c1.json",
+    "general_1024_1": {
+        "path": "data/general_1024cluster_1.json",
         "label2cluster": None,
         "cluster2labels": None,
     },
-    "1280-1": {
-        "path": "data/cluster_map_1280c1.json",
+    "general_1024_2": {
+        "path": "data/general_1024cluster_2.json",
         "label2cluster": None,
         "cluster2labels": None,
     },
-    "1280-2": {
-        "path": "data/cluster_map_1280c2.json",
-        "label2cluster": None,
-        "cluster2labels": None,
-    },
-    "1440-3": {
-        "path": "data/cluster_map_1440c3.json",
-        "label2cluster": None,
-        "cluster2labels": None,
-    },
-    # "1440-4": {
-    #     "path": "data/cluster_map_1440c4.json",
+    # "general_1024_3": {
+    #     "path": "data/general_1024cluster_3.json",
     #     "label2cluster": None,
     #     "cluster2labels": None,
     # },
-    # "1600": {
-    #     "path": "data/cluster_map_1600c.json",
+    # "general_1024_4": {
+    #     "path": "data/general_1024cluster_4.json",
     #     "label2cluster": None,
     #     "cluster2labels": None,
     # },
-    "1600-2": {
-        "path": "data/cluster_map_1600c2.json",
+    "general_1024_5": {
+        "path": "data/general_1024cluster_5.json",
         "label2cluster": None,
         "cluster2labels": None,
     },
-    "1600-3": {
-        "path": "data/cluster_map_1600c3.json",
+    "general_1024_6": {
+        "path": "data/general_1024cluster_6.json",
+        "label2cluster": None,
+        "cluster2labels": None,
+    },
+    "character_1024_1": {
+        "path": "data/character_1024cluster_1.json",
+        "label2cluster": None,
+        "cluster2labels": None,
+    },
+    "character_2048_1": {
+        "path": "data/character_2048cluster_1.json",
+        "label2cluster": None,
+        "cluster2labels": None,
+    },
+    "character_3072_1": {
+        "path": "data/character_3072cluster_1.json",
         "label2cluster": None,
         "cluster2labels": None,
     },
@@ -102,6 +107,8 @@ def demo():
     frequency = prepare_frequency()
 
     def get_same_cluster(tag: str, cluster: str = "1024", temperature: float = 1.0):
+        tag = tag.replace("_", " ")
+
         if tag not in CLUSTER[cluster]["label2cluster"]:
             return f"Unknown tag: {tag}"
 
@@ -160,18 +167,13 @@ def demo():
                     value=get_same_cluster("blue hair", list(CLUSTER.keys())[0], 1.0),
                 )
 
-        tag_input.change(
-            get_same_cluster,
-            inputs=[tag_input, cluster_radio, temperature_slider],
-            outputs=[similar_tags_label],
-        )
-        cluster_radio.change(
-            get_same_cluster,
-            inputs=[tag_input, cluster_radio, temperature_slider],
-            outputs=[similar_tags_label],
-        )
-        temperature_slider.change(
-            get_same_cluster,
+        gr.on(
+            fn=get_same_cluster,
+            triggers=[
+                tag_input.change,
+                cluster_radio.change,
+                temperature_slider.change,
+            ],
             inputs=[tag_input, cluster_radio, temperature_slider],
             outputs=[similar_tags_label],
         )
