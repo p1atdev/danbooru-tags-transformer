@@ -20,7 +20,7 @@ TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241019-sft-use-1"
+PUSH_ID = "p1atdev/dart-v3-20241020-sft-use-group-1"
 
 YEAR_MIN = 2017
 
@@ -75,14 +75,14 @@ def gaussian_distribution_random(
 
 # 条件とする確率を生成 (0.0 から 1.0 の範囲で0寄り多め)
 def get_condition_rate(batch_size: int = 1) -> list[float]:
-    rand = power_distribution_random(n=1.25, size=batch_size)
+    rand = power_distribution_random(n=2, size=batch_size)
     return rand.tolist()
 
 
-# temperature を生成 (0~2で1寄り)
-def get_temperature(batch_size: int = 1) -> list[float]:
-    rand = gaussian_distribution_random(mean=1.0, max_value=1.5, size=batch_size)
-    return rand.tolist()
+# # temperature を生成 (0~2で1寄り)
+# def get_temperature(batch_size: int = 1) -> list[float]:
+#     rand = gaussian_distribution_random(mean=1.0, max_value=1.25, size=batch_size)
+#     return rand.tolist()
 
 
 def prepare_dataset():
@@ -170,11 +170,9 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
     batch_size = len(examples["id"])
     # ランダムに確率を変動させる
     condition_rates = get_condition_rate(batch_size)
-    temperatures = get_temperature(batch_size)
+    # temperatures = get_temperature(batch_size)
 
-    for i, (condition_rate, temperature) in enumerate(
-        zip(condition_rates, temperatures, strict=True)
-    ):
+    for i, condition_rate in enumerate(condition_rates):
         # prompt = composer.compose_sft_list(
         prompt = composer.compose_sft_use_list(
             general_tags=examples["general"][i],
@@ -184,7 +182,6 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
             rating=examples["rating"][i],
             image_width=examples["image_width"][i],
             image_height=examples["image_height"][i],
-            temperature=temperature,
             condition_rate=condition_rate,
         )
         text_list.append(prompt)
@@ -287,6 +284,7 @@ def main():
         num_proc=NUM_PROC,
         fn_kwargs={"composer": tag_composer},
         remove_columns=ds.column_names,
+        load_from_cache_file=False,
     )
 
     # filter None
@@ -294,6 +292,7 @@ def main():
         lambda x: x["text"] is not None,
         batched=False,
         num_proc=NUM_PROC,
+        load_from_cache_file=False,
     )
 
     # tokenize
@@ -302,12 +301,14 @@ def main():
         batched=True,
         num_proc=NUM_PROC,
         fn_kwargs={"tokenizer": tokenizer},
+        load_from_cache_file=False,
     )
 
     # train test split
     ds = ds.train_test_split(
         test_size=10000 if not DEBUG else 10,
         shuffle=True,
+        load_from_cache_file=False,
     )
 
     ds.push_to_hub(

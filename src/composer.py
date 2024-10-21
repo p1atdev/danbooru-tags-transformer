@@ -244,33 +244,36 @@ class TagSelector:
         self,
         tags: list[str],
         condition_rate: float = 0.8,
-        temperature: float = 1.0,
+        # temperature: float = 1.0,
     ) -> Tuple[list[str], list[str]]:
-        all_freqs = self.get_frequencies(tags)
+        # all_freqs = self.get_frequencies(tags)
 
         if condition_rate == 0:
             # 条件なしならそのまま返す
             return [], tags
 
-        conditons, others = [], []
+        if len(tags) == 0:
+            raise ValueError("tags must not be empty")
 
-        for i, tag in enumerate(tags):
-            freqs = avg_softmax(np.array(all_freqs[i:]), temperature)
-            criteria = freqs[0] * condition_rate  # 先頭(現在)のタグの確率
-            rand = random.random()
-            if criteria > rand:
-                conditons.append(tag)
-            else:
-                others.append(tag)
-        if len(conditons) == 0 and len(others) == 0:  # 一度も条件が発生しなかった場合
+        max_condition_tags = math.ceil(len(tags) * condition_rate)
+        condition_tags_count = min(random.randint(0, max_condition_tags), len(tags) - 1)
+
+        # randomly take condition tags
+        if condition_tags_count == 0:
+            return [], tags  # no condition tags
+
+        conditions = random.sample(tags, condition_tags_count)
+        others = [tag for tag in tags if tag not in conditions]
+
+        if len(conditions) == 0 and len(others) == 0:  # 一度も条件が発生しなかった場合
             others = tags
 
         # 抜けがないかチェック
-        assert len(conditons) + len(others) == len(
+        assert len(conditions) + len(others) == len(
             tags
-        ), f"{len(conditons)} + {len(others)} != {len(tags)}"
+        ), f"{len(conditions)} + {len(others)} != {len(tags)}"
 
-        return conditons, others
+        return conditions, others
 
     # 出現頻度が低いタグを取り除く
     def remove_low_frequency_tags(
@@ -285,7 +288,6 @@ class TagSelector:
         self,
         tags: list[str],
         condition_rate: float = 0.5,
-        temperature: float = 1.0,
     ) -> Tuple[list[list[str]], list[str], list[str]]:
         high_priorities: list[list[str]] = []
         low_priorities: list[str] = self.remove_low_frequency_tags(tags)
@@ -301,23 +303,22 @@ class TagSelector:
                     high_priorities[i].append(tag)
                     low_priorities.remove(tag)
 
-        # 条件付にぶち込むタグと、生成する側のタグに分ける
-        conditions, remains = [], []
+        if len(low_priorities) == 0:
+            return (high_priorities, [], [])
 
-        # クラスターごとに分類
-        cluster_tags = self.clustering_tags(low_priorities)
-        for cluster_id, in_cluster_tags in cluster_tags.items():
-            # 条件に入れるタグと入れないタグを分類
-            conditons, others = self.random_conditioning(
-                in_cluster_tags, condition_rate, temperature
-            )
-            conditions.extend(conditons)
-            remains.extend(others)
+        # 条件付にぶち込むタグと、生成する側のタグに分ける
+        condition_tags, remains_tags = self.random_conditioning(
+            low_priorities,
+            condition_rate,
+        )
+
+        # print(len(remains_tags))
+        assert len(remains_tags) > 0, "remains must not be empty"
 
         # remains はソートする
-        remains = sorted(remains, key=lambda x: self.tag_to_position[x])
+        remains_tags = sorted(remains_tags, key=lambda x: self.tag_to_position[x])
 
-        return (high_priorities, conditions, remains)
+        return (high_priorities, condition_tags, remains_tags)
 
     # 単純に出現頻度順にソートする
     def sort_tags_by_frequency(
@@ -365,7 +366,6 @@ class TagComposer:
         rating: SHORT_RATING_TAG,
         image_width: int,
         image_height: int,
-        temperature: float = 1.0,
         condition_rate: float = 0.0,
     ) -> str | None:  # returns None if the prompt should be skipped
         # タグを取得
@@ -386,7 +386,7 @@ class TagComposer:
             self.selector.separate_and_sort_tags(
                 general_tags,
                 condition_rate=condition_rate,
-                temperature=temperature,
+                # temperature=temperature,
             )
         )
         top_insert_tags = []
@@ -448,7 +448,6 @@ class TagComposer:
         rating: SHORT_RATING_TAG,
         image_width: int,
         image_height: int,
-        temperature: float = 1.0,
         condition_rate: float = 0.0,
         full_dropout_rate: float = 0.05,  # 5%の確率で全てのgeneralタグをドロップして条件に含めない
     ) -> str | None:  # returns None if the prompt should be skipped
@@ -472,7 +471,6 @@ class TagComposer:
             self.selector.separate_and_sort_tags(
                 general_tags,
                 condition_rate=condition_rate,
-                temperature=temperature,
             )
         )
         if is_full_dropout:
@@ -565,7 +563,6 @@ class TagComposer:
         rating: SHORT_RATING_TAG,
         image_width: int,
         image_height: int,
-        temperature: float = 1.0,
         condition_rate: float = 0.0,
         full_dropout_rate: float = 0.05,  # 5%の確率で全てのgeneralタグをドロップして条件に含めない
     ) -> str | None:  # returns None if the prompt should be skipped
@@ -589,14 +586,17 @@ class TagComposer:
             self.selector.separate_and_sort_tags(
                 general_tags,
                 condition_rate=condition_rate,
-                temperature=temperature,
             )
         )
+        if len(low_priorities) == 0:
+            # 生成部分がないなら削除
+            return None
+
         # use の時は条件も生成部分に追加する
-        low_priorities.extend(conditions)
-        low_priorities = self.selector.sort_tags_by_frequency(low_priorities)
         if is_full_dropout:
             # 条件なし
+            low_priorities.extend(conditions)
+            low_priorities = self.selector.sort_tags_by_frequency(low_priorities)
             conditions = []
 
         top_insert_tags = []
@@ -648,6 +648,16 @@ class TagComposer:
             if random.random() < 0.5:  # 50%の確率でドロップ
                 copyright_tags = []
 
+        # 生成部分
+        # condition_tags をシャッフルする前に取得
+        meta_general = (
+            ["<group>"]
+            + condition_tags
+            + ["</group>"]
+            + meta_remains_tags
+            + low_priorities
+        )
+
         # シャッフル
         random.shuffle(condition_tags)
         random.shuffle(character_tags)
@@ -657,8 +667,8 @@ class TagComposer:
         rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
         random.shuffle(rating_aspect_ratio_length)
 
-        # 生成部分
-        meta_general = top_insert_tags + meta_remains_tags + low_priorities
+        # print(len(condition_tags), len(meta_general))
+        assert len(condition_tags) != len(meta_general)
 
         # テンプレートに適用
         prompt = format_sft_with_use_condition(
