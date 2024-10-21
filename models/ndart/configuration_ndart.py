@@ -9,27 +9,27 @@ class NDartConfig(PretrainedConfig):
 
     def __init__(
         self,
-        natural_config=None,
-        tag_config=None,
+        encoder_config=None,
+        decoder_config=None,
         ignore_index=-100,
         natural_token_index=32000,
         projector_hidden_act="gelu",
-        natural_feature_layer=-1,
+        encoder_feature_layer=-1,
         **kwargs,
     ):
         self.ignore_index = ignore_index
         self.natural_token_index = natural_token_index
         self.projector_hidden_act = projector_hidden_act
-        self.natural_feature_layer = natural_feature_layer
+        self.encoder_feature_layer = encoder_feature_layer
 
-        if isinstance(natural_config, dict):
-            natural_config["model_type"] = (
-                natural_config["model_type"]
-                if "model_type" in natural_config
+        if isinstance(encoder_config, dict):
+            encoder_config["model_type"] = (
+                encoder_config["model_type"]
+                if "model_type" in encoder_config
                 else "bert"  # e5
             )
-        elif natural_config is None:
-            natural_config = CONFIG_MAPPING["bert"](  # intfloat/multilingual-e5-small
+        elif encoder_config is None:
+            encoder_config = CONFIG_MAPPING["bert"](  # intfloat/multilingual-e5-small
                 hidden_act="gelu",
                 hidden_size=384,
                 intermediate_size=1536,
@@ -44,16 +44,16 @@ class NDartConfig(PretrainedConfig):
                 vocab_size=250037,
             )
 
-        self.natural_config = natural_config
+        self.encoder_config = encoder_config
 
-        if isinstance(tag_config, dict):
-            tag_config["model_type"] = (
-                tag_config["model_type"]
-                if "model_type" in tag_config
+        if isinstance(decoder_config, dict):
+            decoder_config["model_type"] = (
+                decoder_config["model_type"]
+                if "model_type" in decoder_config
                 else "llama"  # dart
             )
-        elif tag_config is None:
-            tag_config = CONFIG_MAPPING["llama"](  # dart
+        elif decoder_config is None:
+            decoder_config = CONFIG_MAPPING["llama"](  # dart
                 attention_bias=False,
                 head_dim=96,
                 hidden_act="silu",
@@ -70,6 +70,6 @@ class NDartConfig(PretrainedConfig):
                 vocab_size=37540,
             )
 
-        self.tag_config = tag_config
+        self.decoder_config = decoder_config
 
         super().__init__(**kwargs)

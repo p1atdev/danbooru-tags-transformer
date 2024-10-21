@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from collections import UserDict
 
 import torch
 import torch.nn as nn
@@ -9,11 +10,11 @@ from transformers import (
     LlamaForCausalLM,
     BertModel,
     PreTrainedTokenizerBase,
+    PreTrainedTokenizer,
     AutoTokenizer,
     ProcessorMixin,
     GenerationMixin,
     BatchFeature,
-    PreTrainedTokenizerFast,
 )
 from transformers.processing_utils import ProcessingKwargs
 
@@ -29,20 +30,14 @@ class NDartProcessorKwargs:
     }
 
 
-@dataclass
-class NDartProcessingOutput:
-    natural: BatchFeature
-    tag: BatchFeature
-
-
 class NDartProcessor(ProcessorMixin):
     attributes = ["natural_tokenizer", "tag_tokenizer"]
     valid_kwargs = ["chat_template", "natural_token"]
     natural_tokenizer_class = "AutoTokenizer"
     tag_tokenizer_class = "AutoTokenizer"
 
-    natural_tokenizer: PreTrainedTokenizerBase
-    tag_tokenizer: PreTrainedTokenizerBase
+    natural_tokenizer: PreTrainedTokenizer
+    tag_tokenizer: PreTrainedTokenizer
 
     def __init__(
         self,
@@ -55,14 +50,16 @@ class NDartProcessor(ProcessorMixin):
         super().__init__(
             natural_tokenizer, tag_tokenizer, chat_template=chat_template, **kwargs
         )
-        self.natural_token_id = self.tag_tokenizer.convert_tokens_to_ids(natural_token)
+        self.natural_token_id: int = self.tag_tokenizer.convert_tokens_to_ids(
+            natural_token
+        )
 
     def __call__(
         self,
         natural_text: str | list[str] | None = None,
         tag_text: str | list[str] | None = None,
         **kwargs,
-    ) -> NDartProcessingOutput:
+    ) -> BatchFeature:
         if tag_text is None:
             raise ValueError("tag_text is required for NDartProcessor")
 
@@ -114,14 +111,13 @@ class NDartProcessor(ProcessorMixin):
             decoder_attention_mask=tag_tokens["attention_mask"],
         )
 
-        return NDartProcessingOutput(
-            natural=BatchFeature(data={**natural_tokens}),
-            tag=BatchFeature(
-                data={
-                    "input_ids": tag_input_ids,
-                    "attention_mask": tag_attention_mask,
-                }
-            ),
+        return BatchFeature(
+            data={
+                "input_ids": tag_input_ids,
+                "attention_mask": tag_attention_mask,
+                "encoder_input_ids": natural_tokens["input_ids"],
+                "encoder_attention_mask": natural_tokens["attention_mask"],
+            }
         )
 
     def insert_encoder_tokens_batch(
@@ -133,6 +129,8 @@ class NDartProcessor(ProcessorMixin):
     ):
         new_input_ids = []
         new_attention_mask = []
+
+        has_decoder_attention_mask = decoder_attention_mask is not None
 
         encoder_token_lens = (
             encoder_attention_mask.sum(dim=1)
@@ -171,20 +169,23 @@ class NDartProcessor(ProcessorMixin):
             )
             new_input_ids.append(new_input_ids_i)
 
-            if decoder_attention_mask is not None:
+            if has_decoder_attention_mask:
                 attention_mask_i = decoder_attention_mask[i]
                 new_attention_mask_i = torch.cat(
                     [
                         attention_mask_i[:position]
                         if position > 0
                         else torch.tensor([]),
-                        attention_mask_i,
+                        torch.ones_like(replacement_tokens),
                         attention_mask_i[position + 1 :]
                         if position + 1 < len(attention_mask_i)
                         else torch.tensor([]),
                     ]
                 )
                 new_attention_mask.append(new_attention_mask_i)
+                assert (
+                    new_attention_mask_i.size(0) == new_input_ids_i.size(0)
+                ), f"Attention mask size mismatch: {new_attention_mask_i.size(0)} != {new_input_ids_i.size(0)}"
 
         # padding right
         new_input_ids_tensor = nn.utils.rnn.pad_sequence(
@@ -198,7 +199,7 @@ class NDartProcessor(ProcessorMixin):
                 batch_first=True,
                 padding_value=0,
             )
-            if new_attention_mask
+            if has_decoder_attention_mask
             else None
         )
         return new_input_ids_tensor, new_attention_mask_tensor
