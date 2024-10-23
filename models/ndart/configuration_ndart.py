@@ -27,6 +27,9 @@ class NDartConfig(PretrainedConfig):
                 if "model_type" in encoder_config
                 else "bert"  # e5
             )
+            encoder_config = CONFIG_MAPPING[encoder_config["model_type"]](
+                **encoder_config
+            )
         elif encoder_config is None:
             encoder_config = CONFIG_MAPPING["bert"](  # intfloat/multilingual-e5-small
                 hidden_act="gelu",
@@ -50,6 +53,9 @@ class NDartConfig(PretrainedConfig):
                 decoder_config["model_type"]
                 if "model_type" in decoder_config
                 else "llama"  # dart
+            )
+            decoder_config = CONFIG_MAPPING[decoder_config["model_type"]](
+                **decoder_config
             )
         elif decoder_config is None:
             decoder_config = CONFIG_MAPPING["llama"](  # dart
