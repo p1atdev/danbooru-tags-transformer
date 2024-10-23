@@ -42,6 +42,11 @@ class PredefinedTagType(Enum):
     INSERT_START = "insert_start"
 
 
+class MatchingType(Enum):
+    INCLUDE = "include"  # 部分一致
+    FULL = "full"  # 完全一致
+
+
 class PredefinedTags:
     """
     事前に指定したタグの管理をおこなうクラス
@@ -51,57 +56,118 @@ class PredefinedTags:
     tags: list[str]
     tag_type: PredefinedTagType
 
-    def __init__(self, tags: list[str], tag_type: PredefinedTagType):
+    def __init__(
+        self, tags: list[str], tag_type: PredefinedTagType, matching_type: MatchingType
+    ):
         self.tags = tags
         self.tag_type = tag_type
+        self.matching_type = matching_type
 
     # テキストファイルから読み込む
     @classmethod
-    def from_txt_file(cls, path: str, tag_type: PredefinedTagType) -> "PredefinedTags":
+    def from_txt_file(
+        cls, path: str, tag_type: PredefinedTagType, matching_type: MatchingType
+    ) -> "PredefinedTags":
         with open(path, "r") as f:
             tags = f.readlines()
             tags = [tag.strip() for tag in tags if tag.strip()]
-        return cls(tags, tag_type)
+        return cls(tags, tag_type, matching_type)
 
     @classmethod
     def artistic_error(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/artistic_error.txt", PredefinedTagType.REMOVE)
+        return cls.from_txt_file(
+            "tags/artistic_error.txt",
+            PredefinedTagType.REMOVE,
+            MatchingType.INCLUDE,
+        )
 
     @classmethod
     def background(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/background.txt", PredefinedTagType.INSERT_START)
+        return cls.from_txt_file(
+            "tags/background.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
 
     @classmethod
     def ban_meta(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/ban_meta.txt", PredefinedTagType.BAN)
+        return cls.from_txt_file(
+            "tags/ban_meta.txt",
+            PredefinedTagType.BAN,
+            MatchingType.INCLUDE,
+        )
 
     @classmethod
     def color_theme(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/color_theme.txt", PredefinedTagType.INSERT_START)
+        return cls.from_txt_file(
+            "tags/color_theme.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
 
     @classmethod
     def displeasing_meta(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/displeasing_meta.txt", PredefinedTagType.REMOVE)
+        return cls.from_txt_file(
+            "tags/displeasing_meta.txt",
+            PredefinedTagType.REMOVE,
+            MatchingType.INCLUDE,
+        )
 
     @classmethod
     def focus(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/focus.txt", PredefinedTagType.INSERT_START)
+        return cls.from_txt_file(
+            "tags/focus.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
 
     @classmethod
     def people(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/people.txt", PredefinedTagType.INSERT_START)
+        return cls.from_txt_file(
+            "tags/people.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
 
     @classmethod
     def usable_meta(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/usable_meta.txt", PredefinedTagType.INSERT_START)
+        return cls.from_txt_file(
+            "tags/usable_meta.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
 
     @classmethod
     def medium(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/medium.txt", PredefinedTagType.INSERT_START)
+        return cls.from_txt_file(
+            "tags/medium.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
 
     @classmethod
     def watermark(cls) -> "PredefinedTags":
-        return cls.from_txt_file("tags/watermark.txt", PredefinedTagType.REMOVE)
+        return cls.from_txt_file(
+            "tags/watermark.txt",
+            PredefinedTagType.REMOVE,
+            MatchingType.FULL,
+        )
+
+    @classmethod
+    def condition_only(cls) -> "PredefinedTags":
+        return cls.from_txt_file(
+            "tags/condition_only.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
+
+    @classmethod
+    def text(cls) -> "PredefinedTags":
+        return cls.from_txt_file(
+            "tags/text.txt",
+            PredefinedTagType.INSERT_START,
+            MatchingType.FULL,
+        )
 
 
 # 出現頻度を計算するクラス
@@ -347,6 +413,9 @@ class TagComposer:
         PredefinedTags.focus(),
         PredefinedTags.color_theme(),
         PredefinedTags.background(),
+        # ↓ 除外しないが、生成部分には入れないタグ
+        PredefinedTags.condition_only(),  # comic など、条件部分に必ず入るタグ
+        PredefinedTags.text(),  # english text など
     ]
 
     def __init__(self, cluster: TagCluster, frequency: TagFrequency):
@@ -473,6 +542,10 @@ class TagComposer:
                 condition_rate=condition_rate,
             )
         )
+        if len(low_priorities) == 0:
+            # 生成部分がないなら削除
+            return None
+
         if is_full_dropout:
             # 条件部分を低優先度に移動
             low_priorities.extend(conditions)
