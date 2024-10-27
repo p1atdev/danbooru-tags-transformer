@@ -136,6 +136,9 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
 
         self.post_init()
 
+    def get_input_embeddings(self):
+        return self.decoder_model.get_input_embeddings()
+
     def _replace_natural_token_embeddings(
         self,
         encoder_embeds: torch.Tensor,
@@ -179,7 +182,7 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
         output_attentions: bool | None = None,
         output_hidden_states: bool | None = None,
         return_dict: bool | None = None,
-        num_logits_to_keep: int | None = None,
+        num_logits_to_keep: int = 0,
         **kwargs,
     ):
         # 0. validate inputs
@@ -270,15 +273,10 @@ class NDartForConditionalGeneration(NDartPreTrainedModel, GenerationMixin):
                 shift_logits = logits[..., :-1, :].contiguous()
                 shift_labels = labels[..., 1:].contiguous()
 
-            # Flatten the tokens
-            num_items = kwargs.pop("num_items", None)
+            # calculate loss
             loss = nn.functional.cross_entropy(
-                shift_logits,
-                shift_labels,
-                ignore_index=-100,
-                reduction="sum",
+                shift_logits, shift_labels, ignore_index=-100
             )
-            loss = loss / num_items
 
         if not return_dict:
             output = (logits,) + outputs[1:]

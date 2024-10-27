@@ -16,6 +16,7 @@ from .formatter import (
     format_completion,
     format_sft_with_initial_condition,
     format_sft_with_use_condition,
+    format_ndart_with_simple_conversion,
 )
 
 
@@ -753,3 +754,96 @@ class TagComposer:
         )
 
         return prompt
+
+    def compose_ndart_list(
+        self,
+        general_tags: list[str],
+        copyright_tags: list[str],
+        character_tags: list[str],
+        meta_tags: list[str],
+        rating: SHORT_RATING_TAG,
+        image_width: int,
+        image_height: int,
+        condition_rate: float = 0.0,
+    ) -> str | None:  # returns None if the prompt should be skipped
+        # タグを取得
+        if is_extreme_aspect_ratio(image_width, image_height):
+            return None
+        aspect_ratio_tag = calculate_aspect_ratio_tag(image_width, image_height)
+
+        # ほかのタグ
+        rating_tag = get_rating_tag(rating)
+        length_tag = get_length_tag(len(general_tags))
+
+        assert isinstance(general_tags, list)
+        if len(general_tags) == 0:
+            return None
+
+        # タグをソート
+        high_priorities, _conditions, low_priorities = (
+            self.selector.separate_and_sort_tags(
+                general_tags,
+                condition_rate=condition_rate,
+                # temperature=temperature,
+            )
+        )
+        top_insert_tags = []
+        for tags, predefined in zip(
+            high_priorities, self.selector.high_priority_groups, strict=True
+        ):
+            if predefined.tag_type == PredefinedTagType.BAN:
+                if len(tags) > 0:
+                    # BAN row
+                    return None
+            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                # just remove
+                continue
+            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                top_insert_tags.extend(self.selector.sort_tags_by_frequency(tags))
+
+        assert isinstance(meta_tags, list)
+        ok_meta_tags = []
+        for predefined in self.predefined_meta_tags:
+            for tag_part in predefined.tags:
+                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
+                    if tag_part in tag:
+                        if predefined.tag_type == PredefinedTagType.BAN:
+                            # BAN row
+                            return None
+                        elif predefined.tag_type == PredefinedTagType.REMOVE:
+                            # just remove
+                            meta_tags.remove(tag)
+                            continue
+                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                            # do nothing
+                            ok_meta_tags.append(tag)
+        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
+
+        # 出現頻度順にソート
+        character_tags = self.selector.sort_tags_by_frequency(character_tags)
+        copyright_tags = self.selector.sort_tags_by_frequency(copyright_tags)
+
+        rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
+        meta_general = top_insert_tags + meta_tags + low_priorities
+
+        # テンプレートに適用
+        prompt = format_ndart_with_simple_conversion(
+            rating_aspect_ratio_length=rating_aspect_ratio_length,
+            copyright=copyright_tags,
+            character=character_tags,
+            meta_general=meta_general,
+        )
+
+        return prompt
+
+    # 自然言語の入力のフォーマット
+    def compose_natural_list(
+        self,
+        general_tags: list[str],
+        copyright_tags: list[str],
+        character_tags: list[str],
+    ):
+        tags = general_tags + character_tags + copyright_tags
+        random.shuffle(tags)
+
+        return ", ".join(tags)

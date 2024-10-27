@@ -28,6 +28,9 @@ BAN_END = InstructionTokens.BAN_END
 PROJECTION_START = MultiModalTokens.PROJECTION_START
 # PROJECTION_END = MultiModalTokens.PROJECTION_END
 LINEART_START = MultiModalTokens.LINEART_START
+NATURAL_START = MultiModalTokens.NATURAL_START
+NATURAL_END = MultiModalTokens.NATURAL_END
+NATURAL_PLACEHOLDER = MultiModalTokens.NATURAL_PLACEHOLDER
 
 # 後続の生成をするテンプレート
 TAG_COMPLETION_TEMPLATE = (
@@ -101,42 +104,17 @@ TAG_USE_CONDITION_TEMPLATE = (
     f"{EOS}"
 ).strip()
 
-TAG_RESTRICTION_CONDITION_TEMPLATE = (
+# 翻訳条件を含むテンプレート
+TAG_NATURAL_TAG_TRANSLATION_TEMPLATE = (
     f"{BOS}"
     #
     "{rating_aspect_ratio_length}"  # shuffle
+    # encoder input
+    f"{NATURAL_START}"
+    f"{NATURAL_PLACEHOLDER}"
+    f"{NATURAL_END}"
     #
-    f"{COPYRIGHT_START}"
-    "{copyright}"
-    f"{COPYRIGHT_END}"
-    #
-    f"{CHARACTER_START}"
-    "{character}"
-    f"{CHARACTER_END}"
-    # restriction
-    f"{USE_START}"
-    "{use}"
-    f"{USE_END}"
-    f"{BAN_START}"
-    "{ban}"
-    f"{BAN_END}"
-    #
-    f"{GENERAL_START}"
-    f"{INPUT_END}"  #! instruction end
-    "{priority}, {meta}, {general}"
-    f"{GENERAL_END}"
-    #
-    f"{EOS}"
-).strip()
-
-TAG_PROJECTION_CONDITION_TEMPLATE = (
-    f"{BOS}"
-    # projection
-    f"{PROJECTION_START}"
-    #
-    "{rating_aspect_ratio_length}"  # shuffle
-    #
-    f"{INPUT_END}"  #! instruction end
+    f"{INPUT_END}"
     #
     f"{COPYRIGHT_START}"
     "{copyright}"
@@ -147,31 +125,7 @@ TAG_PROJECTION_CONDITION_TEMPLATE = (
     f"{CHARACTER_END}"
     #
     f"{GENERAL_START}"
-    "{priority}, {meta}, {general}"
-    f"{GENERAL_END}"
-    #
-    f"{EOS}"
-).strip()
-
-TAG_LINEART_CONDITION_TEMPLATE = (
-    f"{BOS}"
-    # projection
-    f"{LINEART_START}"
-    #
-    "{rating_aspect_ratio_length}"  # shuffle
-    #
-    f"{INPUT_END}"  #! instruction end
-    #
-    f"{COPYRIGHT_START}"
-    "{copyright}"
-    f"{COPYRIGHT_END}"
-    #
-    f"{CHARACTER_START}"
-    "{character}"
-    f"{CHARACTER_END}"
-    #
-    f"{GENERAL_START}"
-    "{priority}, {meta}, {general}"
+    "{meta_general}"
     f"{GENERAL_END}"
     #
     f"{EOS}"
@@ -224,6 +178,20 @@ def format_sft_with_use_condition(
     return TAG_USE_CONDITION_TEMPLATE.format(
         rating_aspect_ratio_length="".join(rating_aspect_ratio_length),
         condition=", ".join(condition),
+        copyright=", ".join(copyright),
+        character=", ".join(character),
+        meta_general=", ".join(meta_general),
+    )
+
+
+def format_ndart_with_simple_conversion(
+    copyright: list[str],
+    character: list[str],
+    meta_general: list[str],
+    rating_aspect_ratio_length: list[str],
+):
+    return TAG_NATURAL_TAG_TRANSLATION_TEMPLATE.format(
+        rating_aspect_ratio_length="".join(rating_aspect_ratio_length),
         copyright=", ".join(copyright),
         character=", ".join(character),
         meta_general=", ".join(meta_general),
