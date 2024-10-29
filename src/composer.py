@@ -366,9 +366,17 @@ class TagSelector:
             for tag in (
                 low_priorities.copy()
             ):  # must copy to remove elements later in the loop
-                if tag in group.tags:
-                    high_priorities[i].append(tag)
-                    low_priorities.remove(tag)
+                if group.matching_type == MatchingType.INCLUDE:
+                    for group_tag in group.tags:
+                        if group_tag in tag:
+                            high_priorities[i].append(tag)
+                            low_priorities.remove(tag)
+                elif group.matching_type == MatchingType.FULL:
+                    if tag in group.tags:
+                        high_priorities[i].append(tag)
+                        low_priorities.remove(tag)
+                else:
+                    raise ValueError("Invalid matching type")
 
         if len(low_priorities) == 0:
             return (high_priorities, [], [])
@@ -477,18 +485,35 @@ class TagComposer:
         ok_meta_tags = []
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
-                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
-                    if tag_part in tag:
-                        if predefined.tag_type == PredefinedTagType.BAN:
-                            # BAN row
-                            return None
-                        elif predefined.tag_type == PredefinedTagType.REMOVE:
-                            # just remove
-                            meta_tags.remove(tag)
-                            continue
-                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                            # do nothing
-                            ok_meta_tags.append(tag)
+                for tag in meta_tags.copy():
+                    # 部分的にでも含まれていたら
+                    if predefined.matching_type == MatchingType.INCLUDE:
+                        if tag_part in tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    elif predefined.matching_type == MatchingType.FULL:
+                        if tag_part == tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    else:
+                        raise ValueError("Invalid matching type")
+
         meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 出現頻度順にソート
@@ -571,18 +596,34 @@ class TagComposer:
         ok_meta_tags = []
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
-                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
-                    if tag_part in tag:
-                        if predefined.tag_type == PredefinedTagType.BAN:
-                            # BAN row
-                            return None
-                        elif predefined.tag_type == PredefinedTagType.REMOVE:
-                            # just remove
-                            meta_tags.remove(tag)
-                            continue
-                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                            # do nothing
-                            ok_meta_tags.append(tag)
+                for tag in meta_tags.copy():
+                    # 部分的にでも含まれていたら
+                    if predefined.matching_type == MatchingType.INCLUDE:
+                        if tag_part in tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    elif predefined.matching_type == MatchingType.FULL:
+                        if tag_part == tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    else:
+                        raise ValueError("Invalid matching type")
         meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 条件部分
@@ -691,18 +732,34 @@ class TagComposer:
         ok_meta_tags = []
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
-                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
-                    if tag_part in tag:
-                        if predefined.tag_type == PredefinedTagType.BAN:
-                            # BAN row
-                            return None
-                        elif predefined.tag_type == PredefinedTagType.REMOVE:
-                            # just remove
-                            meta_tags.remove(tag)
-                            continue
-                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                            # do nothing
-                            ok_meta_tags.append(tag)
+                for tag in meta_tags.copy():
+                    # 部分的にでも含まれていたら
+                    if predefined.matching_type == MatchingType.INCLUDE:
+                        if tag_part in tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    elif predefined.matching_type == MatchingType.FULL:
+                        if tag_part == tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    else:
+                        raise ValueError("Invalid matching type")
         meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 条件部分
@@ -806,17 +863,32 @@ class TagComposer:
         for predefined in self.predefined_meta_tags:
             for tag_part in predefined.tags:
                 for tag in meta_tags.copy():  # 部分的にでも含まれていたら
-                    if tag_part in tag:
-                        if predefined.tag_type == PredefinedTagType.BAN:
-                            # BAN row
-                            return None
-                        elif predefined.tag_type == PredefinedTagType.REMOVE:
-                            # just remove
-                            meta_tags.remove(tag)
-                            continue
-                        elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                            # do nothing
-                            ok_meta_tags.append(tag)
+                    if predefined.matching_type == MatchingType.INCLUDE:
+                        if tag_part in tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    elif predefined.matching_type == MatchingType.FULL:
+                        if tag_part == tag:
+                            if predefined.tag_type == PredefinedTagType.BAN:
+                                # BAN row
+                                return None
+                            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                                # just remove
+                                meta_tags.remove(tag)
+                                continue
+                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                                # do nothing
+                                ok_meta_tags.append(tag)
+                    else:
+                        raise ValueError("Invalid matching type")
         meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
 
         # 出現頻度順にソート
