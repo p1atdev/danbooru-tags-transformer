@@ -8,6 +8,9 @@ watermark grid
 sample watermark
 too many watermarks
 
+dated
+web address
+
 miyoushe watermark
 photo date watermark
 weibo watermark
