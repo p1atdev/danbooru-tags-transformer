@@ -386,6 +386,13 @@ class TagSelector:
     ) -> list[str]:
         return sorted(tags, key=lambda x: self.frequency.tag_to_frequency[x])
 
+    # 事前計算した絶対位置順にソートする
+    def sort_tags_by_position(
+        self,
+        tags: list[str],
+    ) -> list[str]:
+        return sorted(tags, key=lambda x: self.tag_to_position[x])
+
 
 # タグのプロンプトを生成するクラス
 class TagComposer:
@@ -430,7 +437,6 @@ class TagComposer:
         rating: SHORT_RATING_TAG,
         image_width: int,
         image_height: int,
-        condition_rate: float = 0.0,
     ) -> str | None:  # returns None if the prompt should be skipped
         # タグを取得
         if is_extreme_aspect_ratio(image_width, image_height):
@@ -504,14 +510,14 @@ class TagComposer:
         ## 2. ソート
 
         generation_part = (
-            self.general_selector.sort_tags_by_frequency(
-                keep_general_part + insert_general_part
-            )
+            self.general_selector.sort_tags_by_position(keep_general_part)  # 確定枠先に
+            # generalタグは事前計算した絶対位置順にソート
+            + self.general_selector.sort_tags_by_position(insert_general_part)
             + self.meta_selector.sort_tags_by_frequency(
                 keep_meta_part + insert_meta_part
             )
             # + self.meta_selector.sort_tags_by_frequency(meta_part)
-            + self.general_selector.sort_tags_by_frequency(general_part)
+            + self.general_selector.sort_tags_by_position(general_part)
         )
 
         # 出現頻度順にソート
@@ -625,13 +631,12 @@ class TagComposer:
             condition_part = []  # 条件なし
             # 個別にソート
             generation_part = (
-                self.general_selector.sort_tags_by_frequency(
-                    keep_general_part + insert_general_part
-                )
+                self.general_selector.sort_tags_by_position(keep_general_part)
+                + self.general_selector.sort_tags_by_position(insert_general_part)
                 + self.meta_selector.sort_tags_by_frequency(
                     keep_meta_part + insert_meta_part  # + meta_part
                 )
-                + self.general_selector.sort_tags_by_frequency(general_part)
+                + self.general_selector.sort_tags_by_position(general_part)
             )
         else:
             condition_general, generation_general = random_choose(
@@ -654,11 +659,9 @@ class TagComposer:
             )
             generation_part = (
                 self.meta_selector.sort_tags_by_frequency(insert_generation_meta)
-                + self.general_selector.sort_tags_by_frequency(
-                    insert_generation_general
-                )
+                + self.general_selector.sort_tags_by_position(insert_generation_general)
                 # + self.meta_selector.sort_tags_by_frequency(generation_meta)
-                + self.general_selector.sort_tags_by_frequency(generation_general)
+                + self.general_selector.sort_tags_by_position(generation_general)
             )
 
         # オリジナルなら original タグを確率でドロップ
@@ -781,13 +784,12 @@ class TagComposer:
             condition_part = []  # 条件なし
             # 個別にソート
             generation_part = (
-                self.general_selector.sort_tags_by_frequency(
-                    keep_general_part + insert_general_part
-                )
+                self.general_selector.sort_tags_by_position(keep_general_part)
+                + self.general_selector.sort_tags_by_position(insert_general_part)
                 + self.meta_selector.sort_tags_by_frequency(
                     keep_meta_part + insert_meta_part  # +meta_part
                 )
-                + self.general_selector.sort_tags_by_frequency(general_part)
+                + self.general_selector.sort_tags_by_position(general_part)
             )
         else:
             condition_general, generation_general = random_choose(
@@ -810,11 +812,9 @@ class TagComposer:
             )
             generation_part = (
                 self.meta_selector.sort_tags_by_frequency(insert_generation_meta)
-                + self.general_selector.sort_tags_by_frequency(
-                    insert_generation_general
-                )
+                + self.general_selector.sort_tags_by_position(insert_generation_general)
                 # + self.meta_selector.sort_tags_by_frequency(generation_meta)
-                + self.general_selector.sort_tags_by_frequency(generation_general)
+                + self.general_selector.sort_tags_by_position(generation_general)
             )
 
         # オリジナルなら original タグを確率でドロップ
@@ -955,9 +955,9 @@ class TagComposer:
         )
         generation_part = (
             self.meta_selector.sort_tags_by_frequency(insert_generation_meta)
-            + self.general_selector.sort_tags_by_frequency(insert_generation_general)
+            + self.general_selector.sort_tags_by_position(insert_generation_general)
             + self.meta_selector.sort_tags_by_frequency(generation_meta)
-            + self.general_selector.sort_tags_by_frequency(generation_general)
+            + self.general_selector.sort_tags_by_position(generation_general)
         )
 
         rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
