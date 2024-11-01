@@ -2,11 +2,20 @@ monochrome
 multiple monochrome
 greyscale
 sepia
+
 flat color
 muted color
-limited palette
-high contrast
 pale color
+
+pastel colors
+imageboard colors
+inverted colors
+analogous colors
+
+neon palette
+limited palette
+
+high contrast
 
 greyscale with colored background
 spot color

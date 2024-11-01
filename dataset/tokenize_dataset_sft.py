@@ -20,7 +20,7 @@ TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241023-sft-1"
+PUSH_ID = "p1atdev/dart-v3-20241101-sft-2"
 
 YEAR_MIN = 2017
 
@@ -30,7 +30,8 @@ SEED = 12345
 
 DEBUG = False
 
-FULL_DROPOUT_RATE = 0.05  # general タグを全部条件から外す確率
+FULL_DROPOUT_RATE = 0.01  # general タグを全部条件から外す確率
+ORIGINAL_DROPOUT_RATE = 0.75  # original タグをドロップする確率
 
 
 # べき乗を使ったランダムな値を生成する関数
@@ -79,12 +80,6 @@ def get_condition_rate(batch_size: int = 1) -> list[float]:
     return rand.tolist()
 
 
-# # temperature を生成 (0~2で1寄り)
-# def get_temperature(batch_size: int = 1) -> list[float]:
-#     rand = gaussian_distribution_random(mean=1.0, max_value=1.25, size=batch_size)
-#     return rand.tolist()
-
-
 def prepare_dataset():
     ds = load_dataset(DATASET_REPO_ID, revision=REVISION, split=DATASET_SPLIT)
     assert isinstance(ds, Dataset)
@@ -103,6 +98,22 @@ def filter_by_year(examples: Dataset):
     for date in examples["created_at"]:
         year = int(date.split("-")[0])
         flags.append(year >= YEAR_MIN)
+
+    return flags
+
+
+def filter_by_score(examples: Dataset):
+    flags = []
+    for i, score in enumerate(examples["score"]):
+        rating = examples["rating"][i]
+        if rating == "g":
+            flags.append(score >= 0)
+        elif rating == "s":
+            flags.append(score >= 1)
+        elif rating == "q":
+            flags.append(score >= 3)
+        elif rating == "e":
+            flags.append(score >= 3)
 
     return flags
 
@@ -170,11 +181,9 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
     batch_size = len(examples["id"])
     # ランダムに確率を変動させる
     condition_rates = get_condition_rate(batch_size)
-    # temperatures = get_temperature(batch_size)
 
     for i, condition_rate in enumerate(condition_rates):
         prompt = composer.compose_sft_list(
-            # prompt = composer.compose_sft_use_list(
             general_tags=examples["general"][i],
             copyright_tags=examples["copyright"][i],
             character_tags=examples["character"][i],
@@ -183,6 +192,7 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
             image_width=examples["image_width"][i],
             image_height=examples["image_height"][i],
             condition_rate=condition_rate,
+            original_dropout_rate=ORIGINAL_DROPOUT_RATE,
         )
         text_list.append(prompt)
 
@@ -218,6 +228,14 @@ def main():
     # filter by year
     ds = ds.filter(
         filter_by_year,
+        batched=True,
+        batch_size=1024,
+        num_proc=NUM_PROC,
+    )
+
+    # filter by score
+    ds = ds.filter(
+        filter_by_score,
         batched=True,
         batch_size=1024,
         num_proc=NUM_PROC,

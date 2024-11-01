@@ -41,6 +41,8 @@ class PredefinedTagType(Enum):
     REMOVE = "remove"
     # 先頭に挿入
     INSERT_START = "insert_start"
+    # 保持
+    KEEP = "keep"
 
 
 class MatchingType(Enum):
@@ -86,7 +88,7 @@ class PredefinedTags:
     def background(cls) -> "PredefinedTags":
         return cls.from_txt_file(
             "tags/background.txt",
-            PredefinedTagType.INSERT_START,
+            PredefinedTagType.KEEP,
             MatchingType.FULL,
         )
 
@@ -102,7 +104,7 @@ class PredefinedTags:
     def color_theme(cls) -> "PredefinedTags":
         return cls.from_txt_file(
             "tags/color_theme.txt",
-            PredefinedTagType.INSERT_START,
+            PredefinedTagType.KEEP,
             MatchingType.FULL,
         )
 
@@ -118,7 +120,7 @@ class PredefinedTags:
     def focus(cls) -> "PredefinedTags":
         return cls.from_txt_file(
             "tags/focus.txt",
-            PredefinedTagType.INSERT_START,
+            PredefinedTagType.KEEP,
             MatchingType.FULL,
         )
 
@@ -126,7 +128,7 @@ class PredefinedTags:
     def people(cls) -> "PredefinedTags":
         return cls.from_txt_file(
             "tags/people.txt",
-            PredefinedTagType.INSERT_START,
+            PredefinedTagType.KEEP,
             MatchingType.FULL,
         )
 
@@ -158,7 +160,7 @@ class PredefinedTags:
     def condition_only(cls) -> "PredefinedTags":
         return cls.from_txt_file(
             "tags/condition_only.txt",
-            PredefinedTagType.INSERT_START,
+            PredefinedTagType.KEEP,
             MatchingType.FULL,
         )
 
@@ -166,7 +168,7 @@ class PredefinedTags:
     def text(cls) -> "PredefinedTags":
         return cls.from_txt_file(
             "tags/text.txt",
-            PredefinedTagType.INSERT_START,
+            PredefinedTagType.KEEP,
             MatchingType.FULL,
         )
 
@@ -350,50 +352,32 @@ class TagSelector:
     ) -> list[str]:
         return [tag for tag in tags if self.frequency.tag_to_frequency[tag] > threshold]
 
-    # ソートと条件分類を同時におこなう
-    def separate_and_sort_tags(
+    # 先約のみを分離
+    def separate_high_priority_tags(
         self,
         tags: list[str],
-        condition_rate: float = 0.5,
-    ) -> Tuple[list[list[str]], list[str], list[str]]:
-        high_priorities: list[list[str]] = []
-        low_priorities: list[str] = self.remove_low_frequency_tags(tags)
+    ) -> tuple[list[list[str]], list[str]]:
+        high_priority_tags: list[list[str]] = []
+        low_priority_tags: list[str] = self.remove_low_frequency_tags(tags)
 
-        # プライオリティは取り除く
         for i, group in enumerate(self.high_priority_groups):
-            high_priorities.append([])
+            high_priority_tags.append([])
 
-            for tag in (
-                low_priorities.copy()
-            ):  # must copy to remove elements later in the loop
+            for tag in low_priority_tags.copy():
                 if group.matching_type == MatchingType.INCLUDE:
                     for group_tag in group.tags:
                         if group_tag in tag:
-                            high_priorities[i].append(tag)
-                            low_priorities.remove(tag)
+                            high_priority_tags[i].append(tag)
+                            low_priority_tags.remove(tag)
+                            break  # groupのチェックを終わる
                 elif group.matching_type == MatchingType.FULL:
                     if tag in group.tags:
-                        high_priorities[i].append(tag)
-                        low_priorities.remove(tag)
+                        high_priority_tags[i].append(tag)
+                        low_priority_tags.remove(tag)
                 else:
                     raise ValueError("Invalid matching type")
 
-        if len(low_priorities) == 0:
-            return (high_priorities, [], [])
-
-        # 条件付にぶち込むタグと、生成する側のタグに分ける
-        condition_tags, remains_tags = self.random_conditioning(
-            low_priorities,
-            condition_rate,
-        )
-
-        # print(len(remains_tags))
-        assert len(remains_tags) > 0, "remains must not be empty"
-
-        # remains はソートする
-        remains_tags = sorted(remains_tags, key=lambda x: self.tag_to_position[x])
-
-        return (high_priorities, condition_tags, remains_tags)
+        return high_priority_tags, low_priority_tags
 
     # 単純に出現頻度順にソートする
     def sort_tags_by_frequency(
@@ -431,9 +415,11 @@ class TagComposer:
         self.cluster = cluster
         self.frequency = frequency
 
-        predefined_tags = self.predefined_general_tags
+        self.general_selector = self.get_selector(self.predefined_general_tags)
+        self.meta_selector = self.get_selector(self.predefined_meta_tags)
 
-        self.selector = TagSelector(cluster, frequency, predefined_tags)
+    def get_selector(self, predefined: list[PredefinedTags]):
+        return TagSelector(self.cluster, self.frequency, predefined)
 
     def compose_pretrain_list(
         self,
@@ -460,16 +446,31 @@ class TagComposer:
             return None
 
         # タグをソート
-        high_priorities, _conditions, low_priorities = (
-            self.selector.separate_and_sort_tags(
+        high_priortiy_general, low_priority_general = (
+            self.general_selector.separate_high_priority_tags(
                 general_tags,
-                condition_rate=condition_rate,
-                # temperature=temperature,
             )
         )
-        top_insert_tags = []
+        high_priority_meta, low_priority_meta = (
+            self.meta_selector.separate_high_priority_tags(meta_tags)
+        )
+
+        # 条件パート | 生成パート
+        keep_meta_part = []  # 絶対に条件になる meta
+        keep_general_part = []  # 絶対に条件になる general
+        insert_meta_part = []  # 先約あり meta、シャッフルできない、ソートして配置
+        insert_general_part = []  # 先約あり general、シャッフルできない、ソートして配置
+        meta_part = low_priority_meta  # 生成部分、シャッフルしない、ソートして配置
+        general_part = (
+            low_priority_general  # 生成部分, シャッフルしない、ソートして配置
+        )
+
+        ## 1. 事前定義したタグかどうか
+
         for tags, predefined in zip(
-            high_priorities, self.selector.high_priority_groups, strict=True
+            high_priortiy_general,
+            self.general_selector.high_priority_groups,
+            strict=True,
         ):
             if predefined.tag_type == PredefinedTagType.BAN:
                 if len(tags) > 0:
@@ -479,54 +480,49 @@ class TagComposer:
                 # just remove
                 continue
             elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                top_insert_tags.extend(self.selector.sort_tags_by_frequency(tags))
+                insert_general_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_general_part.extend(tags)  # 確定枠
 
-        assert isinstance(meta_tags, list)
-        ok_meta_tags = []
-        for predefined in self.predefined_meta_tags:
-            for tag_part in predefined.tags:
-                for tag in meta_tags.copy():
-                    # 部分的にでも含まれていたら
-                    if predefined.matching_type == MatchingType.INCLUDE:
-                        if tag_part in tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    elif predefined.matching_type == MatchingType.FULL:
-                        if tag_part == tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    else:
-                        raise ValueError("Invalid matching type")
+        for tags, predefined in zip(
+            high_priority_meta,
+            self.meta_selector.high_priority_groups,
+            strict=True,
+        ):
+            if predefined.tag_type == PredefinedTagType.BAN:
+                if len(tags) > 0:
+                    # BAN row
+                    return None
+            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                # just remove
+                continue
+            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                insert_meta_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_meta_part.extend(tags)  # 確定枠
 
-        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
+        ## 2. ソート
+
+        generation_part = (
+            self.general_selector.sort_tags_by_frequency(
+                keep_general_part + insert_general_part
+            )
+            + self.meta_selector.sort_tags_by_frequency(
+                keep_meta_part + insert_meta_part
+            )
+            # + self.meta_selector.sort_tags_by_frequency(meta_part)
+            + self.general_selector.sort_tags_by_frequency(general_part)
+        )
 
         # 出現頻度順にソート
-        character_tags = self.selector.sort_tags_by_frequency(character_tags)
-        copyright_tags = self.selector.sort_tags_by_frequency(copyright_tags)
+        character_tags = self.general_selector.sort_tags_by_frequency(character_tags)
+        copyright_tags = self.general_selector.sort_tags_by_frequency(copyright_tags)
 
         # テンプレートに適用
         prompt = format_completion(
-            priority=top_insert_tags,
-            general=low_priorities,
+            generation=generation_part,
             character=character_tags,
             copyright=copyright_tags,
-            meta=meta_tags,
             rating=rating_tag,
             aspect_ratio=aspect_ratio_tag,
             length=length_tag,
@@ -545,6 +541,7 @@ class TagComposer:
         image_height: int,
         condition_rate: float = 0.0,
         full_dropout_rate: float = 0.05,  # 5%の確率で全てのgeneralタグをドロップして条件に含めない
+        original_dropout_rate: float = 0.5,  # originalタグをドロップする確率
     ) -> str | None:  # returns None if the prompt should be skipped
         # タグを取得
         if is_extreme_aspect_ratio(image_width, image_height):
@@ -561,26 +558,35 @@ class TagComposer:
 
         is_full_dropout = full_dropout_rate > 0 and random.random() < full_dropout_rate
 
-        # タグをソート
-        high_priorities, conditions, low_priorities = (
-            self.selector.separate_and_sort_tags(
+        # 先約済み、残り
+        high_priortiy_general, low_priority_general = (
+            self.general_selector.separate_high_priority_tags(
                 general_tags,
-                condition_rate=condition_rate,
             )
         )
-        if len(low_priorities) == 0:
+        if len(low_priority_general) == 0:
             # 生成部分がないなら削除
             return None
+        high_priority_meta, low_priority_meta = (
+            self.meta_selector.separate_high_priority_tags(meta_tags)
+        )
 
-        if is_full_dropout:
-            # 条件部分を低優先度に移動
-            low_priorities.extend(conditions)
-            conditions = []
-            low_priorities = self.selector.sort_tags_by_frequency(low_priorities)
+        # 条件パート | 生成パート
+        keep_meta_part = []  # 絶対に条件になる meta
+        keep_general_part = []  # 絶対に条件になる general
+        insert_meta_part = []  # 先約あり meta、シャッフルできない、ソートして配置
+        insert_general_part = []  # 先約あり general、シャッフルできない、ソートして配置
+        meta_part = low_priority_meta  # 生成部分、シャッフルしない、ソートして配置
+        general_part = (
+            low_priority_general  # 生成部分, シャッフルしない、ソートして配置
+        )
 
-        top_insert_tags = []
+        ## 1. 事前定義したタグかどうか
+
         for tags, predefined in zip(
-            high_priorities, self.selector.high_priority_groups, strict=True
+            high_priortiy_general,
+            self.general_selector.high_priority_groups,
+            strict=True,
         ):
             if predefined.tag_type == PredefinedTagType.BAN:
                 if len(tags) > 0:
@@ -590,61 +596,78 @@ class TagComposer:
                 # just remove
                 continue
             elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                top_insert_tags.extend(tags)
+                insert_general_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_general_part.extend(tags)  # 確定枠
 
-        assert isinstance(meta_tags, list)
-        ok_meta_tags = []
-        for predefined in self.predefined_meta_tags:
-            for tag_part in predefined.tags:
-                for tag in meta_tags.copy():
-                    # 部分的にでも含まれていたら
-                    if predefined.matching_type == MatchingType.INCLUDE:
-                        if tag_part in tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    elif predefined.matching_type == MatchingType.FULL:
-                        if tag_part == tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    else:
-                        raise ValueError("Invalid matching type")
-        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
+        for tags, predefined in zip(
+            high_priority_meta,
+            self.meta_selector.high_priority_groups,
+            strict=True,
+        ):
+            if predefined.tag_type == PredefinedTagType.BAN:
+                if len(tags) > 0:
+                    # BAN row
+                    return None
+            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                # just remove
+                continue
+            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                insert_meta_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_meta_part.extend(tags)  # 確定枠
 
-        # 条件部分
+        ## 2. 条件部分の作成
+        condition_part = []
+        generation_part = []
         if is_full_dropout:
-            # 条件部分を全部補完側に移動
-            meta_condition_tags: list[str] = []
-            meta_remains_tags = meta_tags
-            condition_tags = []
+            # 条件部分を全部補完側に
+            condition_part = []  # 条件なし
+            # 個別にソート
+            generation_part = (
+                self.general_selector.sort_tags_by_frequency(
+                    keep_general_part + insert_general_part
+                )
+                + self.meta_selector.sort_tags_by_frequency(
+                    keep_meta_part + insert_meta_part  # + meta_part
+                )
+                + self.general_selector.sort_tags_by_frequency(general_part)
+            )
         else:
-            meta_condition_tags, meta_remains_tags = random_choose(
-                meta_tags, condition_rate
-            )  # condition_rateの確率でmeta_tagsを含める
-            condition_tags = top_insert_tags + conditions + meta_condition_tags
+            condition_general, generation_general = random_choose(
+                general_part, condition_rate
+            )
+            # condition_meta, generation_meta = random_choose(meta_part, condition_rate)
+            insert_condition_general, insert_generation_general = random_choose(
+                insert_general_part, condition_rate
+            )
+            insert_condition_meta, insert_generation_meta = random_choose(
+                insert_meta_part, condition_rate
+            )
+            condition_part = (
+                keep_general_part
+                + keep_meta_part
+                + condition_general
+                # + condition_meta
+                + insert_condition_meta
+                + insert_condition_general
+            )
+            generation_part = (
+                self.meta_selector.sort_tags_by_frequency(insert_generation_meta)
+                + self.general_selector.sort_tags_by_frequency(
+                    insert_generation_general
+                )
+                # + self.meta_selector.sort_tags_by_frequency(generation_meta)
+                + self.general_selector.sort_tags_by_frequency(generation_general)
+            )
 
         # オリジナルなら original タグを確率でドロップ
         if copyright_tags == ["original"] and character_tags == []:
-            if random.random() < 0.5:  # 50%の確率でドロップ
+            if random.random() < original_dropout_rate:  # 50%の確率でドロップ
                 copyright_tags = []
 
         # シャッフル
-        random.shuffle(condition_tags)
+        random.shuffle(condition_part)
         random.shuffle(character_tags)
         random.shuffle(copyright_tags)
 
@@ -652,19 +675,13 @@ class TagComposer:
         rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
         random.shuffle(rating_aspect_ratio_length)
 
-        # 生成部分
-        if is_full_dropout:
-            meta_general = top_insert_tags + meta_remains_tags + low_priorities
-        else:
-            meta_general = meta_remains_tags + low_priorities
-
         # テンプレートに適用
         prompt = format_sft_with_initial_condition(
             rating_aspect_ratio_length=rating_aspect_ratio_length,  # shuffled
-            condition=condition_tags,  # shuffled
+            condition=condition_part,  # shuffled
             copyright=copyright_tags,  # shuffled
             character=character_tags,  # shuffled
-            meta_general=meta_general,
+            generation=generation_part,
         )
 
         return prompt
@@ -680,6 +697,7 @@ class TagComposer:
         image_height: int,
         condition_rate: float = 0.0,
         full_dropout_rate: float = 0.05,  # 5%の確率で全てのgeneralタグをドロップして条件に含めない
+        original_dropout_rate: float = 0.5,  # originalタグをドロップする確率
     ) -> str | None:  # returns None if the prompt should be skipped
         # タグを取得
         if is_extreme_aspect_ratio(image_width, image_height):
@@ -696,27 +714,35 @@ class TagComposer:
 
         is_full_dropout = full_dropout_rate > 0 and random.random() < full_dropout_rate
 
-        # タグをソート
-        high_priorities, conditions, low_priorities = (
-            self.selector.separate_and_sort_tags(
+        # 先約済み、残り
+        high_priortiy_general, low_priority_general = (
+            self.general_selector.separate_high_priority_tags(
                 general_tags,
-                condition_rate=condition_rate,
             )
         )
-        if len(low_priorities) == 0:
+        if len(low_priority_general) == 0:
             # 生成部分がないなら削除
             return None
+        high_priority_meta, low_priority_meta = (
+            self.meta_selector.separate_high_priority_tags(meta_tags)
+        )
 
-        # use の時は条件も生成部分に追加する
-        if is_full_dropout:
-            # 条件なし
-            low_priorities.extend(conditions)
-            low_priorities = self.selector.sort_tags_by_frequency(low_priorities)
-            conditions = []
+        # 条件パート | 生成パート
+        keep_meta_part = []  # 絶対に条件になる meta
+        keep_general_part = []  # 絶対に条件になる general
+        insert_meta_part = []  # 先約あり meta、シャッフルできない、ソートして配置
+        insert_general_part = []  # 先約あり general、シャッフルできない、ソートして配置
+        meta_part = low_priority_meta  # 生成部分、シャッフルしない、ソートして配置
+        general_part = (
+            low_priority_general  # 生成部分, シャッフルしない、ソートして配置
+        )
 
-        top_insert_tags = []
+        ## 1. 事前定義したタグかどうか
+
         for tags, predefined in zip(
-            high_priorities, self.selector.high_priority_groups, strict=True
+            high_priortiy_general,
+            self.general_selector.high_priority_groups,
+            strict=True,
         ):
             if predefined.tag_type == PredefinedTagType.BAN:
                 if len(tags) > 0:
@@ -726,71 +752,82 @@ class TagComposer:
                 # just remove
                 continue
             elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                top_insert_tags.extend(tags)
+                insert_general_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_general_part.extend(tags)  # 確定枠
 
-        assert isinstance(meta_tags, list)
-        ok_meta_tags = []
-        for predefined in self.predefined_meta_tags:
-            for tag_part in predefined.tags:
-                for tag in meta_tags.copy():
-                    # 部分的にでも含まれていたら
-                    if predefined.matching_type == MatchingType.INCLUDE:
-                        if tag_part in tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    elif predefined.matching_type == MatchingType.FULL:
-                        if tag_part == tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    else:
-                        raise ValueError("Invalid matching type")
-        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
+        for tags, predefined in zip(
+            high_priority_meta,
+            self.meta_selector.high_priority_groups,
+            strict=True,
+        ):
+            if predefined.tag_type == PredefinedTagType.BAN:
+                if len(tags) > 0:
+                    # BAN row
+                    return None
+            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                # just remove
+                continue
+            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                insert_meta_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_meta_part.extend(tags)  # 確定枠
 
-        # 条件部分
+        ## 2. 条件部分の作成
+        condition_part = []
+        generation_part = []
         if is_full_dropout:
-            # 条件部分を全部補完側に移動
-            meta_condition_tags: list[str] = []
-            meta_remains_tags = meta_tags
-            condition_tags = []
+            # 条件部分を全部補完側に
+            condition_part = []  # 条件なし
+            # 個別にソート
+            generation_part = (
+                self.general_selector.sort_tags_by_frequency(
+                    keep_general_part + insert_general_part
+                )
+                + self.meta_selector.sort_tags_by_frequency(
+                    keep_meta_part + insert_meta_part  # +meta_part
+                )
+                + self.general_selector.sort_tags_by_frequency(general_part)
+            )
         else:
-            meta_condition_tags, meta_remains_tags = random_choose(
-                meta_tags, condition_rate
-            )  # condition_rateの確率でmeta_tagsを含める
-            condition_tags = top_insert_tags + conditions + meta_condition_tags
+            condition_general, generation_general = random_choose(
+                general_part, condition_rate
+            )
+            # condition_meta, generation_meta = random_choose(meta_part, condition_rate)
+            insert_condition_general, insert_generation_general = random_choose(
+                insert_general_part, condition_rate
+            )
+            insert_condition_meta, insert_generation_meta = random_choose(
+                insert_meta_part, condition_rate
+            )
+            condition_part = (
+                keep_general_part
+                + keep_meta_part
+                + condition_general
+                # + condition_meta
+                + insert_condition_meta
+                + insert_condition_general
+            )
+            generation_part = (
+                self.meta_selector.sort_tags_by_frequency(insert_generation_meta)
+                + self.general_selector.sort_tags_by_frequency(
+                    insert_generation_general
+                )
+                # + self.meta_selector.sort_tags_by_frequency(generation_meta)
+                + self.general_selector.sort_tags_by_frequency(generation_general)
+            )
 
         # オリジナルなら original タグを確率でドロップ
         if copyright_tags == ["original"] and character_tags == []:
-            if random.random() < 0.5:  # 50%の確率でドロップ
+            if random.random() < original_dropout_rate:  # 50%の確率でドロップ
                 copyright_tags = []
 
         # 生成部分
         # condition_tags をシャッフルする前に取得
-        meta_general = (
-            ["<group>"]
-            + condition_tags
-            + ["</group>"]
-            + meta_remains_tags
-            + low_priorities
-        )
+        generation_part = ["<group>"] + condition_part + ["</group>"] + general_part
 
-        # シャッフル
-        random.shuffle(condition_tags)
+        # # シャッフル
+        random.shuffle(condition_part)
         random.shuffle(character_tags)
         random.shuffle(copyright_tags)
 
@@ -798,16 +835,15 @@ class TagComposer:
         rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
         random.shuffle(rating_aspect_ratio_length)
 
-        # print(len(condition_tags), len(meta_general))
-        assert len(condition_tags) != len(meta_general)
+        assert len(condition_part) != len(generation_part)
 
         # テンプレートに適用
         prompt = format_sft_with_use_condition(
             rating_aspect_ratio_length=rating_aspect_ratio_length,  # shuffled
-            condition=condition_tags,  # shuffled
+            condition=condition_part,  # shuffled
             copyright=copyright_tags,  # shuffled
             character=character_tags,  # shuffled
-            meta_general=meta_general,
+            meta_general=generation_part,
         )
 
         return prompt
@@ -836,17 +872,35 @@ class TagComposer:
         if len(general_tags) == 0:
             return None
 
-        # タグをソート
-        high_priorities, _conditions, low_priorities = (
-            self.selector.separate_and_sort_tags(
+        # 先約済み、残り
+        high_priortiy_general, low_priority_general = (
+            self.general_selector.separate_high_priority_tags(
                 general_tags,
-                condition_rate=condition_rate,
-                # temperature=temperature,
             )
         )
-        top_insert_tags = []
+        if len(low_priority_general) == 0:
+            # 生成部分がないなら削除
+            return None
+        high_priority_meta, low_priority_meta = (
+            self.meta_selector.separate_high_priority_tags(meta_tags)
+        )
+
+        # 条件パート | 生成パート
+        keep_meta_part = []  # 絶対に条件になる meta
+        keep_general_part = []  # 絶対に条件になる general
+        insert_meta_part = []  # 先約あり meta、シャッフルできない、ソートして配置
+        insert_general_part = []  # 先約あり general、シャッフルできない、ソートして配置
+        meta_part = low_priority_meta  # 生成部分、シャッフルしない、ソートして配置
+        general_part = (
+            low_priority_general  # 生成部分, シャッフルしない、ソートして配置
+        )
+
+        ## 1. 事前定義したタグかどうか
+
         for tags, predefined in zip(
-            high_priorities, self.selector.high_priority_groups, strict=True
+            high_priortiy_general,
+            self.general_selector.high_priority_groups,
+            strict=True,
         ):
             if predefined.tag_type == PredefinedTagType.BAN:
                 if len(tags) > 0:
@@ -856,55 +910,66 @@ class TagComposer:
                 # just remove
                 continue
             elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                top_insert_tags.extend(self.selector.sort_tags_by_frequency(tags))
+                insert_general_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_general_part.extend(tags)  # 確定枠
 
-        assert isinstance(meta_tags, list)
-        ok_meta_tags = []
-        for predefined in self.predefined_meta_tags:
-            for tag_part in predefined.tags:
-                for tag in meta_tags.copy():  # 部分的にでも含まれていたら
-                    if predefined.matching_type == MatchingType.INCLUDE:
-                        if tag_part in tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    elif predefined.matching_type == MatchingType.FULL:
-                        if tag_part == tag:
-                            if predefined.tag_type == PredefinedTagType.BAN:
-                                # BAN row
-                                return None
-                            elif predefined.tag_type == PredefinedTagType.REMOVE:
-                                # just remove
-                                meta_tags.remove(tag)
-                                continue
-                            elif predefined.tag_type == PredefinedTagType.INSERT_START:
-                                # do nothing
-                                ok_meta_tags.append(tag)
-                    else:
-                        raise ValueError("Invalid matching type")
-        meta_tags = self.selector.sort_tags_by_frequency(ok_meta_tags)
+        for tags, predefined in zip(
+            high_priority_meta,
+            self.meta_selector.high_priority_groups,
+            strict=True,
+        ):
+            if predefined.tag_type == PredefinedTagType.BAN:
+                if len(tags) > 0:
+                    # BAN row
+                    return None
+            elif predefined.tag_type == PredefinedTagType.REMOVE:
+                # just remove
+                continue
+            elif predefined.tag_type == PredefinedTagType.INSERT_START:
+                insert_meta_part.extend(tags)  # 優先枠
+            elif predefined.tag_type == PredefinedTagType.KEEP:
+                keep_meta_part.extend(tags)  # 確定枠
 
-        # 出現頻度順にソート
-        character_tags = self.selector.sort_tags_by_frequency(character_tags)
-        copyright_tags = self.selector.sort_tags_by_frequency(copyright_tags)
+        ## 2. 条件部分の作成
+        condition_part = []
+        generation_part = []
+
+        condition_general, generation_general = random_choose(
+            general_part, condition_rate
+        )
+        # condition_meta, generation_meta = random_choose(meta_part, condition_rate)
+        insert_condition_general, insert_generation_general = random_choose(
+            insert_general_part, condition_rate
+        )
+        insert_condition_meta, insert_generation_meta = random_choose(
+            insert_meta_part, condition_rate
+        )
+        condition_part = (
+            keep_general_part
+            + keep_meta_part
+            + condition_general
+            # + condition_meta
+            + insert_condition_meta
+            + insert_condition_general
+        )
+        generation_part = (
+            self.meta_selector.sort_tags_by_frequency(insert_generation_meta)
+            + self.general_selector.sort_tags_by_frequency(insert_generation_general)
+            + self.meta_selector.sort_tags_by_frequency(generation_meta)
+            + self.general_selector.sort_tags_by_frequency(generation_general)
+        )
 
         rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
-        meta_general = top_insert_tags + meta_tags + low_priorities
 
         # テンプレートに適用
         prompt = format_ndart_with_simple_conversion(
             rating_aspect_ratio_length=rating_aspect_ratio_length,
             copyright=copyright_tags,
             character=character_tags,
-            meta_general=meta_general,
+            meta_general=generation_part,
         )
+        #  TODO: 実装する
 
         return prompt
 

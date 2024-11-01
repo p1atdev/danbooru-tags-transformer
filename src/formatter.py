@@ -49,7 +49,7 @@ TAG_COMPLETION_TEMPLATE = (
     f"{CHARACTER_END}"
     #
     f"{GENERAL_START}"
-    "{priority_meta_general}"
+    "{generation}"
     f"{GENERAL_END}"
     #
     f"{EOS}"
@@ -72,7 +72,7 @@ TAG_INITIAL_CONDITION_TEMPLATE = (
     f"{GENERAL_START}"
     "{condition}"
     f"{INPUT_END}"  #! instruction end
-    "{meta_general}"
+    "{generation}"
     f"{GENERAL_END}"
     #
     f"{EOS}"
@@ -133,17 +133,15 @@ TAG_NATURAL_TAG_TRANSLATION_TEMPLATE = (
 
 
 def format_completion(
-    priority: list[str],  # high priority tags
-    general: list[str],
+    generation: list[str],  # generation tags
     copyright: list[str],
     character: list[str],
-    meta: list[str],
     rating: str,
     aspect_ratio: str,
     length: str,
 ):
     return TAG_COMPLETION_TEMPLATE.format(
-        priority_meta_general=", ".join(priority + meta + general),
+        generation=", ".join(generation),
         copyright=", ".join(copyright),
         character=", ".join(character),
         rating=rating,
@@ -156,7 +154,7 @@ def format_sft_with_initial_condition(
     condition: list[str],
     copyright: list[str],
     character: list[str],
-    meta_general: list[str],
+    generation: list[str],
     rating_aspect_ratio_length: list[str],
 ):
     return TAG_INITIAL_CONDITION_TEMPLATE.format(
@@ -164,7 +162,7 @@ def format_sft_with_initial_condition(
         condition=", ".join(condition),
         copyright=", ".join(copyright),
         character=", ".join(character),
-        meta_general=", ".join(meta_general),
+        generation=", ".join(generation),
     )
 
 
