@@ -931,45 +931,33 @@ class TagComposer:
             elif predefined.tag_type == PredefinedTagType.KEEP:
                 keep_meta_part.extend(tags)  # 確定枠
 
-        ## 2. 条件部分の作成
-        condition_part = []
-        generation_part = []
+        ## 2. ソート
 
-        condition_general, generation_general = random_choose(
-            general_part, condition_rate
-        )
-        # condition_meta, generation_meta = random_choose(meta_part, condition_rate)
-        insert_condition_general, insert_generation_general = random_choose(
-            insert_general_part, condition_rate
-        )
-        insert_condition_meta, insert_generation_meta = random_choose(
-            insert_meta_part, condition_rate
-        )
-        condition_part = (
-            keep_general_part
-            + keep_meta_part
-            + condition_general
-            # + condition_meta
-            + insert_condition_meta
-            + insert_condition_general
-        )
         generation_part = (
-            self.meta_selector.sort_tags_by_frequency(insert_generation_meta)
-            + self.general_selector.sort_tags_by_position(insert_generation_general)
-            + self.meta_selector.sort_tags_by_frequency(generation_meta)
-            + self.general_selector.sort_tags_by_position(generation_general)
+            self.general_selector.sort_tags_by_position(keep_general_part)  # 確定枠先に
+            # generalタグは事前計算した絶対位置順にソート
+            + self.general_selector.sort_tags_by_position(insert_general_part)
+            + self.meta_selector.sort_tags_by_frequency(
+                keep_meta_part + insert_meta_part
+            )
+            # + self.meta_selector.sort_tags_by_frequency(meta_part)
+            + self.general_selector.sort_tags_by_position(general_part)
         )
 
         rating_aspect_ratio_length = [rating_tag, aspect_ratio_tag, length_tag]
+
+        ## 3. シャッフル
+        random.shuffle(rating_aspect_ratio_length)
+        random.shuffle(character_tags)
+        random.shuffle(copyright_tags)
 
         # テンプレートに適用
         prompt = format_ndart_with_simple_conversion(
             rating_aspect_ratio_length=rating_aspect_ratio_length,
             copyright=copyright_tags,
             character=character_tags,
-            meta_general=generation_part,
+            generation=generation_part,
         )
-        #  TODO: 実装する
 
         return prompt
 

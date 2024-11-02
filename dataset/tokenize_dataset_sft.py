@@ -20,7 +20,7 @@ TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241101-sft-2"
+PUSH_ID = "p1atdev/dart-v3-20241102-sft-1"
 
 YEAR_MIN = 2017
 

@@ -109,12 +109,10 @@ TAG_NATURAL_TAG_TRANSLATION_TEMPLATE = (
     f"{BOS}"
     #
     "{rating_aspect_ratio_length}"  # shuffle
-    # encoder input
+    #! encoder input
     f"{NATURAL_START}"
     f"{NATURAL_PLACEHOLDER}"
     f"{NATURAL_END}"
-    #
-    f"{INPUT_END}"
     #
     f"{COPYRIGHT_START}"
     "{copyright}"
@@ -125,7 +123,8 @@ TAG_NATURAL_TAG_TRANSLATION_TEMPLATE = (
     f"{CHARACTER_END}"
     #
     f"{GENERAL_START}"
-    "{meta_general}"
+    f"{INPUT_END}"  #! instruction end
+    "{generation}"
     f"{GENERAL_END}"
     #
     f"{EOS}"
@@ -185,12 +184,12 @@ def format_sft_with_use_condition(
 def format_ndart_with_simple_conversion(
     copyright: list[str],
     character: list[str],
-    meta_general: list[str],
+    generation: list[str],
     rating_aspect_ratio_length: list[str],
 ):
     return TAG_NATURAL_TAG_TRANSLATION_TEMPLATE.format(
         rating_aspect_ratio_length="".join(rating_aspect_ratio_length),
         copyright=", ".join(copyright),
         character=", ".join(character),
-        meta_general=", ".join(meta_general),
+        generation=", ".join(generation),
     )

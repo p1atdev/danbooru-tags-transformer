@@ -9,6 +9,8 @@ from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, PreTrainedTokenizer, set_seed
 
 from src.composer import TagComposer, TagCluster, TagFrequency
+from models.ndart.processing_ndart import NDartProcessor
+
 
 MAX_LENGTH = 256
 
@@ -16,11 +18,14 @@ DATASET_REPO_ID = "isek-ai/danbooru-tags-2024"
 REVISION = "202408-at20240906"
 DATASET_SPLIT = "train"
 
-TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
+ENCODER_TOKENIZER_NAME = "intfloat/multilingual-e5-base"
+DECODER_TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
+NATURAL_PLACEHOLDER = "<|natural|>"
+
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241027-ndart-debug-1"
+PUSH_ID = "p1atdev/dart-v3-20241102-ndart-1"
 
 YEAR_MIN = 2017
 
@@ -30,7 +35,7 @@ SEED = 12345
 
 DEBUG = True
 
-FULL_DROPOUT_RATE = 0.05  # general タグを全部条件から外す確率
+# FULL_DROPOUT_RATE = 0.05  # general タグを全部条件から外す確率
 
 
 # べき乗を使ったランダムな値を生成する関数
@@ -86,10 +91,14 @@ def prepare_dataset():
     return ds
 
 
-def prepare_tokenizer():
-    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
+def prepare_processor():
+    processor = NDartProcessor(
+        encoder_tokenizer=AutoTokenizer.from_pretrained(ENCODER_TOKENIZER_NAME),
+        decoder_tokenizer=AutoTokenizer.from_pretrained(DECODER_TOKENIZER_NAME),
+        natural_token=NATURAL_PLACEHOLDER,
+    )
 
-    return tokenizer
+    return processor
 
 
 def filter_by_year(examples: Dataset):
@@ -209,13 +218,9 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
     }
 
 
-# def map_tokenize_text(example: Dataset, tokenizer: PreTrainedTokenizer):
-#     tokenized = tokenizer(example["text"])
-#     input_ids = tokenized["input_ids"]
-
-#     return {
-#         "input_ids": input_ids,
-#     }
+def map_tokenize_text(example: Dataset, processor):
+    inputs = processor(tag_text=example["tag"], natural_text=example["natural"])
+    return inputs
 
 
 def main():
@@ -230,7 +235,7 @@ def main():
     )
 
     ds = prepare_dataset()
-    tokenizer = prepare_tokenizer()
+    processor = prepare_processor()
 
     # filter by year
     ds = ds.filter(
@@ -245,6 +250,14 @@ def main():
         filter_by_score,
         batched=True,
         batch_size=1024,
+        num_proc=NUM_PROC,
+    )
+
+    #! filter only original
+    ds = ds.filter(
+        lambda x: (x["copyright"] == "original" or x["copyright"] is None)
+        and x["character"] is None,
+        batched=False,
         num_proc=NUM_PROC,
     )
 
@@ -271,16 +284,16 @@ def main():
 
     # filter out if copyright or character is unknown
     ds = ds.filter(
-        lambda x: tokenizer.unk_token_id
-        not in tokenizer.encode_plus(
+        lambda x: processor.decoder_tokenizer.unk_token_id
+        not in processor.decoder_tokenizer.encode_plus(
             x["copyright"], add_special_tokens=False
         ).input_ids,
         batched=False,
         num_proc=NUM_PROC,
     )
     ds = ds.filter(
-        lambda x: tokenizer.unk_token_id
-        not in tokenizer.encode_plus(
+        lambda x: processor.decoder_tokenizer.unk_token_id
+        not in processor.decoder_tokenizer.encode_plus(
             x["character"], add_special_tokens=False
         ).input_ids,
         batched=False,
@@ -292,7 +305,7 @@ def main():
         map_split_tags,
         batched=True,
         num_proc=NUM_PROC,
-        fn_kwargs={"tokenizer": tokenizer},
+        fn_kwargs={"tokenizer": processor.decoder_tokenizer},
     )
 
     # filter too many tags
@@ -321,13 +334,13 @@ def main():
     )
 
     # # tokenize
-    # ds = ds.map(
-    #     map_tokenize_text,
-    #     batched=True,
-    #     num_proc=NUM_PROC,
-    #     fn_kwargs={"tokenizer": tokenizer},
-    #     load_from_cache_file=False,
-    # )
+    ds = ds.map(
+        map_tokenize_text,
+        batched=True,
+        num_proc=NUM_PROC,
+        fn_kwargs={"processor": processor},
+        load_from_cache_file=False,
+    )
 
     # train test split
     ds = ds.train_test_split(

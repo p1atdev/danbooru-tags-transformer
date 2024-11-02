@@ -17,15 +17,13 @@ TOKENIZER_NAME = "p1atdev/dart-v3-tokenizer-241010"
 FREQUENCY_PATH = "data/tag_frequency.json"
 CLUSTER_PATH = "data/general_1024cluster_opt17.json"
 
-PUSH_ID = "p1atdev/dart-v3-20241029-pretrain-1"
-
-CONDITION_RATE = 0.0
+PUSH_ID = "p1atdev/dart-v3-20241101-pretrain-1"
 
 NUM_PROC = 40
 
 SEED = 12345
 
-DEBUG = False
+DEBUG = True
 
 
 def prepare_dataset():
@@ -110,7 +108,6 @@ def map_format_tags(examples: Dataset, composer: TagComposer):
             rating=examples["rating"][i],
             image_width=examples["image_width"][i],
             image_height=examples["image_height"][i],
-            condition_rate=CONDITION_RATE,
         )
         text_list.append(prompt)
 
