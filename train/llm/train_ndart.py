@@ -16,7 +16,6 @@ from transformers import (
     set_seed,
 )
 from accelerate import Accelerator
-from trl import DataCollatorForCompletionOnlyLM
 
 from src.tags import InstructionTokens, MultiModalTokens
 from models.ndart.processing_ndart import NDartProcessor
@@ -29,13 +28,13 @@ SEED = 20241006
 
 # pretrained model
 BASE_ENCODER_MODEL_NAME = "intfloat/multilingual-e5-base"
-BASE_DECODER_MODEL_NAME = "p1atdev/dart-v3-llama-8L-241018_241023-sft-2"
+BASE_DECODER_MODEL_NAME = "p1atdev/dart-v3-llama-8L6QKV-241029_241102-sft-1"
 
-DATASET_NAME = "p1atdev/dart-v3-20241027-ndart-debug-1"
+DATASET_NAME = "p1atdev/dart-v3-20241102-ndart-1"
 
 PROJECT_NAME = "danbooru-tags-transformer-v3-natural"
-PUSH_HUB_NAME = "p1atdev/ndart-v3-llama-8L-241018_241023_241027-1"
-SAVE_DIR = "./output/ndart-llama-8L-241018_241023_241027-1"
+PUSH_HUB_NAME = "p1atdev/dart-v3-llama-8L6QKV-241029_241102_241102-NL-1"
+SAVE_DIR = "./output/dart-v3-llama-8L6QKV-241029_241102_241102-NL-1"
 
 NUM_PROC = 4
 
@@ -79,16 +78,19 @@ def prepare_models():
     ###! Encoder training config
     model.encoder_model.requires_grad_(TRAIN_ENCODER)
     model.encoder_model.eval()
+    model.encoder_model = torch.compile(model.encoder_model)
     ###
 
     ###! Projector training config
     model.projection.requires_grad_(TRAIN_PROJECTOR)
     model.projection.eval()
+    model.projection = torch.compile(model.projection)
     ###
 
     ###! Decoder training config
     model.decoder_model.requires_grad_(TRAIN_DECODER)
     model.decoder_model.train()
+    # model.decoder_model = torch.compile(model.decoder_model)
     ###
 
     return processor, model
@@ -111,13 +113,37 @@ def main():
     input_end_id = processor.decoder_tokenizer.convert_tokens_to_ids(INPUT_END)
 
     def collate_fn(examples):
-        # Tokenize the texts and tags
-        batch = processor(
-            natural_text=[example["natural"] for example in examples],
-            tag_text=[example["tag"] for example in examples],
-            return_tensors="pt",
-            padding=True,
-        )
+        batch = {
+            "input_ids": [torch.tensor(example["input_ids"]) for example in examples],
+            "attention_mask": [
+                torch.tensor(example["attention_mask"]) for example in examples
+            ],
+            "encoder_input_ids": [
+                torch.tensor(example["encoder_input_ids"]) for example in examples
+            ],
+            "encoder_attention_mask": [
+                torch.tensor(example["encoder_attention_mask"]) for example in examples
+            ],
+        }
+        # pad
+        batch = {
+            "input_ids": nn.utils.rnn.pad_sequence(
+                batch["input_ids"],
+                batch_first=True,
+                padding_value=processor.decoder_tokenizer.pad_token_id,  # type: ignore
+            ),
+            "attention_mask": nn.utils.rnn.pad_sequence(
+                batch["attention_mask"], batch_first=True, padding_value=0
+            ),
+            "encoder_input_ids": nn.utils.rnn.pad_sequence(
+                batch["encoder_input_ids"],
+                batch_first=True,
+                padding_value=processor.encoder_tokenizer.pad_token_id,  # type: ignore
+            ),
+            "encoder_attention_mask": nn.utils.rnn.pad_sequence(
+                batch["encoder_attention_mask"], batch_first=True, padding_value=0
+            ),
+        }
 
         # The labels are the input_ids, and we mask the padding tokens in the loss computation
         labels = batch["input_ids"].clone()
@@ -176,7 +202,7 @@ def main():
         metric_for_best_model="eval_loss",
         dataloader_num_workers=accelerator.num_processes,
         neftune_noise_alpha=5,
-        torch_compile=True,
+        torch_compile=False,  # compile does not work
         bf16=True,
         report_to=[],
         hub_model_id=PUSH_HUB_NAME,
