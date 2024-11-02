@@ -50,6 +50,11 @@ TRAIN_DECODER = True
 
 
 def prepare_models():
+    # register custom code
+    NDartConfig.register_for_auto_class()
+    NDartForConditionalGeneration.register_for_auto_class("AutoModelForPreTraining")
+    NDartProcessor.register_for_auto_class()
+
     processor = NDartProcessor(
         encoder_tokenizer=AutoTokenizer.from_pretrained(BASE_ENCODER_MODEL_NAME),
         decoder_tokenizer=AutoTokenizer.from_pretrained(BASE_DECODER_MODEL_NAME),
